@@ -19,5 +19,7 @@
     <ProjectReference Include="..\Shared\HostedBlazorWebassemblyApp.Shared.csproj" />
   </ItemGroup>
 
-
+  <PropertyGroup>
+    <EnableSharding>true</EnableSharding>
+  </PropertyGroup>
 </Project>

@@ -243,6 +243,8 @@ async function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourc
     // If anything writes to stderr, treat it as a critical exception. The underlying runtime writes
     // to stderr if a truly critical problem occurs outside .NET code. Note that .NET unhandled
     // exceptions also reach this, but via a different code path - see dotNetCriticalError below.
+    console.log('[ASP ILONA] 0 ' + line);
+    console.log('[ASP ILONA] dataMode ' + resourceLoader.bootConfig.icuDataMode);
     console.error(line);
     showErrorNotification();
   };
@@ -252,11 +254,11 @@ async function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourc
 
   let resourcesLoaded = 0;
   function setProgress(){
-      resourcesLoaded++;
-      const percentage = resourcesLoaded / totalResources.length * 100;
-      document.documentElement.style.setProperty('--blazor-load-percentage', `${percentage}%`);
-      document.documentElement.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(percentage)}%"`);
-    }
+    resourcesLoaded++;
+    const percentage = resourcesLoaded / totalResources.length * 100;
+    document.documentElement.style.setProperty('--blazor-load-percentage', `${percentage}%`);
+    document.documentElement.style.setProperty('--blazor-load-percentage-text', `"${Math.floor(percentage)}%"`);
+  }
 
   // Begin loading the .dll/.pdb/.wasm files, but don't block here. Let other loading processes run in parallel.
   const dotnetWasmResourceName = 'dotnet.wasm';
@@ -284,18 +286,23 @@ async function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourc
     timeZoneResource.response.then(_ => setProgress());
   }
 
-  let icuDataResource: LoadingResource | undefined;
+  const icuDataResources: LoadingResource[] = [];
   if (resourceLoader.bootConfig.icuDataMode !== ICUDataMode.Invariant) {
     const applicationCulture = resourceLoader.startOptions.applicationCulture || (navigator.languages && navigator.languages[0]);
-    const icuDataResourceName = getICUResourceName(resourceLoader.bootConfig, applicationCulture);
-    icuDataResource = resourceLoader.loadResource(
-      icuDataResourceName,
-      `_framework/${icuDataResourceName}`,
-      resourceLoader.bootConfig.resources.runtime[icuDataResourceName],
-      'globalization'
-    );
-    totalResources.push(icuDataResource);
-    icuDataResource.response.then(_ => setProgress());
+    console.log(`[ASP ILONA] applicationCulture=${applicationCulture}`);
+    const icuDataResourceNames = getICUResourceNames(resourceLoader.bootConfig, applicationCulture);
+    icuDataResourceNames.forEach(resourceName => {
+      console.log(`[ASP ILONA] resourceName=${resourceName}`);
+      const icuResource = resourceLoader.loadResource(
+        resourceName,
+        `_framework/${resourceName}`,
+        resourceLoader.bootConfig.resources.runtime[resourceName],
+        'globalization'
+      );
+      icuDataResources.push(icuResource);
+      totalResources.push(icuResource);
+      icuResource.response.then(_ => setProgress());
+    });
   }
 
   const createDotnetRuntime = await dotnetJsBeingLoaded;
@@ -324,7 +331,8 @@ async function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourc
     };
 
     const onRuntimeInitialized = () => {
-      if (!icuDataResource) {
+      if (icuDataResources.length === 0) {
+        console.log('[ASP ILONA] icuDataResources.length === 0');
         // Use invariant culture if the app does not carry icu data.
         MONO.mono_wasm_setenv('DOTNET_SYSTEM_GLOBALIZATION_INVARIANT', '1');
       }
@@ -332,11 +340,13 @@ async function createEmscriptenModuleInstance(resourceLoader: WebAssemblyResourc
 
     const preRun = () => {
       if (timeZoneResource) {
+        console.log(`[ASP ILONA] timeZoneResource=${timeZoneResource}`);
         loadTimezone(timeZoneResource);
       }
 
-      if (icuDataResource) {
-        loadICUData(icuDataResource);
+      if (icuDataResources.length !== 0) {
+        console.log('[ASP ILONA] icuDataResources.length !== 0');
+        loadICUData(icuDataResources);
       }
 
       // Fetch the assemblies and PDBs in the background, telling Mono to wait until they are loaded
@@ -611,43 +621,50 @@ async function loadTimezone(timeZoneResource: LoadingResource): Promise<void> {
   Module.removeRunDependency(runDependencyId);
 }
 
-function getICUResourceName(bootConfig: BootJsonData, culture: string | undefined): string {
-  const combinedICUResourceName = 'icudt.dat';
-  if (!culture || bootConfig.icuDataMode === ICUDataMode.All) {
-    return combinedICUResourceName;
+function getICUResourceNames(bootConfig: BootJsonData, culture: string | undefined): string[] {
+  let code = '';
+  if (culture && bootConfig.icuDataMode === ICUDataMode.Sharded) { // for invariant as well or not?
+    const prefix = culture.split('-')[0];
+    if ([
+      'en',
+      'fr',
+      'it',
+      'de',
+      'es',
+    ].includes(prefix)) {
+      code = 'efigs_';
+    } else if ([
+      'zh',
+      'ko',
+      'ja',
+    ].includes(prefix)) {
+      code = 'cjk_';
+    } else {
+      code = 'no_cjk_';
+    }
   }
 
-  const prefix = culture.split('-')[0];
-  if ([
-    'en',
-    'fr',
-    'it',
-    'de',
-    'es',
-  ].includes(prefix)) {
-    return 'icudt_EFIGS.dat';
-  } else if ([
-    'zh',
-    'ko',
-    'ja',
-  ].includes(prefix)) {
-    return 'icudt_CJK.dat';
-  } else {
-    return 'icudt_no_CJK.dat';
-  }
+  return [
+    'icudt_base.dat',
+    `icudt_${code}locales.dat`,
+    'icudt_currency.dat',
+    'icudt_normalization.dat',
+    `icudt_${code}coll.dat`,
+  ];
 }
 
-async function loadICUData(icuDataResource: LoadingResource): Promise<void> {
+async function loadICUData(icuDataResources: LoadingResource[]): Promise<void> {
   const runDependencyId = 'blazor:icudata';
   Module.addRunDependency(runDependencyId);
+  await Promise.all(icuDataResources.map(async (icuResource) => {
+    const request = await icuResource.response;
+    const array = new Uint8Array(await request.arrayBuffer());
 
-  const request = await icuDataResource.response;
-  const array = new Uint8Array(await request.arrayBuffer());
-
-  const offset = MONO.mono_wasm_load_bytes_into_heap(array);
-  if (!MONO.mono_wasm_load_icu_data(offset)) {
-    throw new Error('Error loading ICU asset.');
-  }
+    const offset = MONO.mono_wasm_load_bytes_into_heap(array);
+    if (!MONO.mono_wasm_load_icu_data(offset)) {
+      throw new Error('Error loading ICU asset.');
+    }
+  }));
   Module.removeRunDependency(runDependencyId);
 }
 
@@ -672,7 +689,7 @@ async function compileWasmModule(wasmResource: LoadingResource, imports: any): P
     // Fall back on ArrayBuffer instantiation.
     const arrayBuffer = await wasmResourceResponse.arrayBuffer();
     const arrayBufferResult = await WebAssembly.instantiate(arrayBuffer, imports);
-    return arrayBufferResult.instance;  
+    return arrayBufferResult.instance;
   }
 }
 
