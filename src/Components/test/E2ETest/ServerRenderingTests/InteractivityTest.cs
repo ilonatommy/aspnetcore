@@ -1433,19 +1433,48 @@ public class InteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<Ra
         Assert404ReExecuted();
     }
 
-    [Theory]
-    // prerendering (SSR) is tested in NoInteractivityTest
-    [InlineData("ServerNonPrerendered")]
-    [InlineData("WebAssemblyNonPrerendered")]
-    public void BrowserNavigationToNotExistingPathReExecutesTo404(string renderMode)
+    [Fact]
+    public void BrowserNavigationToNotExistingPathReExecutesTo404()
     {
         // non-existing path has to have re-execution middleware set up
         // so it has to have "reexecution" prefix. Otherwise middleware mapping
         // will not be activated, see configuration in Startup
-        Navigate($"{ServerPathBase}/reexecution/not-existing-page?renderMode={renderMode}");
+        Navigate($"{ServerPathBase}/reexecution/not-existing-page");
         Assert404ReExecuted();
     }
 
     private void Assert404ReExecuted() =>
-        Browser.Equal("Welcome On Page Re-executed After Not Found Event", () => Browser.Exists(By.Id("test-info")).Text);
+        Browser.Equal("Re-executed page", () => Browser.Title);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DoesNotReExecuteIf404WasHandled_SSR(bool streamingStarted)
+    {
+        string streamingPath = streamingStarted ? "-streaming" : "";
+        Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
+
+        string expectedTitle = streamingStarted
+            ? "Default Not Found Page"
+            : "Not Found Fragment";
+        Browser.Equal(expectedTitle, () => Browser.Title);
+    }
+
+    [Theory] // this scenario works, it's just the title in Wasm Minial does not want to render properly
+    [InlineData("ServerNonPrerendered")]
+    [InlineData("WebAssemblyNonPrerendered")]
+    public void DoesNotReExecuteIf404WasHandled_Interactive(string renderMode)
+    {
+        Navigate($"{ServerPathBase}/reexecution/set-not-found?renderMode={renderMode}");
+
+        string expectedTitle = "Not Found Fragment";
+        Browser.Equal(expectedTitle, () => Browser.Title);
+    }
+
+    [Fact]
+    public void StatusCodePagesWithReExecution()
+    {
+        Navigate($"{ServerPathBase}/reexecution/trigger-404");
+        Assert404ReExecuted();
+    }
 }

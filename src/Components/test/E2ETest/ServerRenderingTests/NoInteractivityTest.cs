@@ -125,6 +125,20 @@ public class NoInteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<
         Browser.Equal("Welcome On Page Re-executed After Not Found Event", () => Browser.Exists(By.Id("test-info")).Text);
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DoesNotReExecuteIf404WasHandled(bool streamingStarted)
+    {
+        string streamingPath = streamingStarted ? "-streaming" : "";
+        Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
+
+        string expectedTitle = streamingStarted
+            ? "Default Not Found Page"
+            : "Not Found Fragment";
+        Browser.Equal(expectedTitle, () => Browser.Title);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void CanRenderNotFoundPageNoStreaming(bool useCustomNotFoundPage)
@@ -158,5 +172,12 @@ public class NoInteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<
 
         string expectedTitle = "Default Not Found Page";
         Browser.Equal(expectedTitle, () => Browser.Title);
+    }
+
+    [Fact]
+    public void StatusCodePagesWithReExecution()
+    {
+        Navigate($"{ServerPathBase}/reexecution/trigger-404");
+        Browser.Equal("Re-executed page", () => Browser.Title);
     }
 }

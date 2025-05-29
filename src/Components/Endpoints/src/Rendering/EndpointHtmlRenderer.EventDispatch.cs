@@ -77,27 +77,30 @@ internal partial class EndpointHtmlRenderer
             : Task.CompletedTask;
     }
 
-    private async Task SetNotFoundResponseAsync(string baseUri)
+    private async Task SetNotFoundResponseAsync()
     {
         if (_httpContext.Response.HasStarted)
         {
+            // we're expecting the Router to continue streaming the NotFound contents
+            var id = Guid.NewGuid().ToString();
+            //System.InvalidOperationException: Headers are read - only, response has already started.
+            //_httpContext.Response.Headers.Add(_streamingRenderingFramingHeaderName, id);
+            _ssrFramingCommentMarkup = $"<!--{id}-->";
             var defaultBufferSize = 16 * 1024;
             await using var writer = new HttpResponseStreamWriter(_httpContext.Response.Body, Encoding.UTF8, defaultBufferSize, ArrayPool<byte>.Shared, ArrayPool<char>.Shared);
             using var bufferWriter = new BufferedTextWriter(writer);
-            var notFoundUri = $"{baseUri}not-found";
-            HandleNavigationAfterResponseStarted(bufferWriter, _httpContext, notFoundUri);
-            await bufferWriter.FlushAsync();
+            bufferWriter.Write(_ssrFramingCommentMarkup);
+            await writer.FlushAsync();
         }
         else
         {
             _httpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            _httpContext.Response.ContentType = null;
-        }
 
-        // When the application triggers a NotFound event, we continue rendering the current batch.
-        // However, after completing this batch, we do not want to process any further UI updates,
-        // as we are going to return a 404 status and discard the UI updates generated so far.
-        SignalRendererToFinishRendering();
+            // When the application triggers a NotFound event, we continue rendering the current batch.
+            // However, after completing this batch, we do not want to process any further UI updates,
+            // as we are going to return a 404 status and discard the UI updates generated so far.
+            SignalRendererToFinishRendering();
+        }
     }
 
     private async Task OnNavigateTo(string uri)
