@@ -1454,13 +1454,12 @@ public class InteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<Ra
         string streamingPath = streamingStarted ? "-streaming" : "";
         Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
 
-        string expectedTitle = streamingStarted
-            ? "Default Not Found Page"
-            : "Not Found Fragment";
-        Browser.Equal(expectedTitle, () => Browser.Title);
+        string expectedTitle = "There's nothing here";
+        var paragraph = Browser.FindElement(By.CssSelector("body > p"));
+        Assert.Equal(expectedTitle, paragraph.Text);
     }
 
-    [Theory] // this scenario works, it's just the title in Wasm Minial does not want to render properly
+    [Theory]
     [InlineData("ServerNonPrerendered")]
     [InlineData("WebAssemblyNonPrerendered")]
     public void DoesNotReExecuteIf404WasHandled_Interactive(string renderMode)

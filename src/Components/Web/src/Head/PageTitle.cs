@@ -9,6 +9,7 @@ namespace Microsoft.AspNetCore.Components.Web;
 /// <summary>
 /// Enables rendering an HTML <c>&lt;title&gt;</c> to a <see cref="HeadOutlet"/> component.
 /// </summary>
+[StreamRendering]
 public sealed class PageTitle : ComponentBase
 {
     /// <summary>

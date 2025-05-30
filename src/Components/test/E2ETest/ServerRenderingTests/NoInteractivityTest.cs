@@ -132,10 +132,9 @@ public class NoInteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<
         string streamingPath = streamingStarted ? "-streaming" : "";
         Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
 
-        string expectedTitle = streamingStarted
-            ? "Default Not Found Page"
-            : "Not Found Fragment";
-        Browser.Equal(expectedTitle, () => Browser.Title);
+        string expectedTitle = "There's nothing here";
+        var paragraph = Browser.FindElement(By.CssSelector("body > p"));
+        Assert.Equal(expectedTitle, paragraph.Text);
     }
 
     [Theory]

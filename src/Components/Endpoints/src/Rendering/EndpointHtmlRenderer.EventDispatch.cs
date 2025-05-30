@@ -77,20 +77,11 @@ internal partial class EndpointHtmlRenderer
             : Task.CompletedTask;
     }
 
-    private async Task SetNotFoundResponseAsync()
+    private void SetNotFoundResponse(object? sender, EventArgs args)
     {
         if (_httpContext.Response.HasStarted)
         {
-            // we're expecting the Router to continue streaming the NotFound contents
-            var id = Guid.NewGuid().ToString();
-            //System.InvalidOperationException: Headers are read - only, response has already started.
-            //_httpContext.Response.Headers.Add(_streamingRenderingFramingHeaderName, id);
-            _ssrFramingCommentMarkup = $"<!--{id}-->";
-            var defaultBufferSize = 16 * 1024;
-            await using var writer = new HttpResponseStreamWriter(_httpContext.Response.Body, Encoding.UTF8, defaultBufferSize, ArrayPool<byte>.Shared, ArrayPool<char>.Shared);
-            using var bufferWriter = new BufferedTextWriter(writer);
-            bufferWriter.Write(_ssrFramingCommentMarkup);
-            await writer.FlushAsync();
+            // We're expecting the Router to continue streaming the NotFound contents
         }
         else
         {
