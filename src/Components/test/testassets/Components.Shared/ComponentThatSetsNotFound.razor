@@ -21,10 +21,6 @@
         {
             await Task.Yield();
         }
-        var skip = false;
-        if (!skip)
-        {
-            NavigationManager.NotFound();
-        }
+        NavigationManager.NotFound();
     }
 }
