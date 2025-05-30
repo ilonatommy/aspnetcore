@@ -1453,22 +1453,21 @@ public class InteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<Ra
     {
         string streamingPath = streamingStarted ? "-streaming" : "";
         Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
-
-        string expectedTitle = "There's nothing here";
-        var paragraph = Browser.FindElement(By.CssSelector("body > p"));
-        Assert.Equal(expectedTitle, paragraph.Text);
+        AssertNotFoundFragmentRendered();
     }
 
     [Theory]
     [InlineData("ServerNonPrerendered")]
     [InlineData("WebAssemblyNonPrerendered")]
-    public void DoesNotReExecuteIf404WasHandled_Interactive(string renderMode)
+    public async Task DoesNotReExecuteIf404WasHandled_Interactive(string renderMode)
     {
         Navigate($"{ServerPathBase}/reexecution/set-not-found?renderMode={renderMode}");
-
-        string expectedTitle = "Not Found Fragment";
-        Browser.Equal(expectedTitle, () => Browser.Title);
+        await Task.Delay(5000);
+        AssertNotFoundFragmentRendered();
     }
+
+    private void AssertNotFoundFragmentRendered() =>
+        Browser.Equal("There's nothing here", () => Browser.FindElement(By.CssSelector("body > p")).Text);
 
     [Fact]
     public void StatusCodePagesWithReExecution()

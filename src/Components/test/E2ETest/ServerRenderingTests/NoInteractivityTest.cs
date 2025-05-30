@@ -131,11 +131,10 @@ public class NoInteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<
     {
         string streamingPath = streamingStarted ? "-streaming" : "";
         Navigate($"{ServerPathBase}/reexecution/set-not-found-ssr{streamingPath}");
-
-        string expectedTitle = "There's nothing here";
-        var paragraph = Browser.FindElement(By.CssSelector("body > p"));
-        Assert.Equal(expectedTitle, paragraph.Text);
+        AssertNotFoundFragmentRendered();
     }
+    private void AssertNotFoundFragmentRendered() =>
+        Browser.Equal("There's nothing here", () => Browser.FindElement(By.CssSelector("body > p")).Text);
 
     [Theory]
     [InlineData(true)]
