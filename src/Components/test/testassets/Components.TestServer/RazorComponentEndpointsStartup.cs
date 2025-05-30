@@ -86,7 +86,9 @@ public class RazorComponentEndpointsStartup<TRootComponent>
                 reexecutionApp.UseStatusCodePagesWithReExecute("/not-found-reexecute", createScopeForErrors: true);
                 reexecutionApp.UseRouting();
 
+
                 reexecutionApp.UseAntiforgery();
+                ConfigureEndpoints(reexecutionApp, env);
                 ConfigureEndpoints(reexecutionApp, env);
             });
 
@@ -94,6 +96,7 @@ public class RazorComponentEndpointsStartup<TRootComponent>
         });
     }
 
+    private void ConfigureSubdirPipeline(IApplicationBuilder app, IWebHostEnvironment env)
     private void ConfigureSubdirPipeline(IApplicationBuilder app, IWebHostEnvironment env)
     {
         WebAssemblyTestHelper.ServeCoopHeadersIfWebAssemblyThreadingEnabled(app);
@@ -112,12 +115,17 @@ public class RazorComponentEndpointsStartup<TRootComponent>
             if (ctx.Request.Query.ContainsKey("add-csp"))
             {
                 ctx.Response.Headers.Add("Content-Security-Policy", "script-src 'self' 'unsafe-inline'");
+                ctx.Response.Headers.Add("Content-Security-Policy", "script-src 'self' 'unsafe-inline'");
             }
             return nxt();
         });
         ConfigureEndpoints(app, env);
     }
+        ConfigureEndpoints(app, env);
+    }
 
+    private void ConfigureEndpoints(IApplicationBuilder app, IWebHostEnvironment env)
+    {
     private void ConfigureEndpoints(IApplicationBuilder app, IWebHostEnvironment env)
     {
         _ = app.UseEndpoints(endpoints =>

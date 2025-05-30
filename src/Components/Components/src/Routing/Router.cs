@@ -399,23 +399,10 @@ public partial class Router : IComponent, IHandleAfterRender, IDisposable
         {
             if (NotFoundPage != null)
             {
-                if (_notFoundLayoutType is Type layoutType)
-                {
-                    // Directly instantiate the layout type, supplying the NotFoundPage as the Body
-                    builder.OpenComponent(0, layoutType);
-                    builder.AddAttribute(1, LayoutComponentBase.BodyPropertyName,
-                        (RenderFragment)(childBuilder =>
-                        {
-                            childBuilder.OpenComponent(2, NotFoundPage);
-                            childBuilder.CloseComponent();
-                        }));
-                    builder.CloseComponent();
-                }
-                else
-                {
-                    builder.OpenComponent(0, NotFoundPage);
-                    builder.CloseComponent();
-                }
+                builder.OpenComponent<RouteView>(0);
+                builder.AddAttribute(1, nameof(RouteView.RouteData),
+                    new RouteData(NotFoundPage, _emptyParametersDictionary));
+                builder.CloseComponent();
             }
             else if (NotFound != null)
             {

@@ -58,8 +58,14 @@ public class RazorComponentEndpointsNoInteractivityStartup<TRootComponent>
                         await context.Response.WriteAsync("Triggered a 404 status code.");
                     });
                 });
-                reexecutionApp.UseStaticFiles();
+
+                if (!env.IsDevelopment())
+                {
+                    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+                }
+
                 reexecutionApp.UseStatusCodePagesWithReExecute("/not-found-reexecute", createScopeForErrors: true);
+                reexecutionApp.UseStaticFiles();
                 reexecutionApp.UseRouting();
                 RazorComponentEndpointsStartup<TRootComponent>.UseFakeAuthState(reexecutionApp);
                 reexecutionApp.UseAntiforgery();
