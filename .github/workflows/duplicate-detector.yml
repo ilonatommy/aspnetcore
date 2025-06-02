@@ -1,0 +1,58 @@
+name: AI-Powered GitHub Issue Duplicates & Relations Detector
+
+# This workflow demonstrates how to use the AI Duplicate Issue Detector action
+# to detect potential duplicate issues automatically.
+#
+# This example includes all the same functionality as the original workflow
+# but uses the published GitHub Action instead of running the scripts directly.
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      issue_number:
+        description: 'Issue number to check for duplicates'
+        required: true
+        type: number
+
+# Add concurrency group to prevent multiple runs for the same issue
+concurrency:
+  # Use issue number if available, otherwise use a unique identifier
+  group: ${{ github.event.issue.number || github.run_id }}
+  # Cancel in-progress runs
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+  id-token: write
+
+jobs:
+  detect-duplicates:
+    runs-on: ubuntu-latest
+    # Add timeout to ensure workflow doesn't run indefinitely
+    timeout-minutes: 10
+    steps:
+      # Optional: Wait for potential edits to settle before processing
+      - name: Wait for potential edits
+        if: github.event.issue
+        run: |
+          echo "Waiting 3.5 minutes for potential additional edits..."
+          sleep 210
+
+      # Use the AI Duplicate Issue Detector action
+      - name: Detect Duplicate Issues
+        uses: ilonatommy/ai-duplicate-detector@v1
+        with:
+          # Required
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+
+          # Optional configurations with defaults
+          duplicate-threshold: 0.85
+          related-issue-threshold: 0.82
+          embedding-model: 'text-embedding-3-large'
+          max-issues-to-process: 100
+
+          # This will be taken from either the issue event or workflow dispatch input
+          issue-number: ${{ github.event.issue.number || inputs.issue_number }}
