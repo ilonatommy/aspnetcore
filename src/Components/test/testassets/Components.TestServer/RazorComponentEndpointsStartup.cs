@@ -62,6 +62,11 @@ public class RazorComponentEndpointsStartup<TRootComponent>
             services.AddHybridCache();
         }
 
+        if (Configuration.GetValue<bool>("UseOutputCache"))
+        {
+            services.AddOutputCache();
+        }
+
         services.AddScoped<InteractiveWebAssemblyService>();
         services.AddScoped<InteractiveServerService>();
         services.AddScoped<InteractiveAutoService>();
@@ -124,6 +129,12 @@ public class RazorComponentEndpointsStartup<TRootComponent>
         }
 
         app.UseRouting();
+
+        if (Configuration.GetValue<bool>("UseOutputCache"))
+        {
+            app.UseOutputCache();
+        }
+
         UseFakeAuthState(app);
         app.UseAntiforgery();
 

@@ -2,6 +2,12 @@
 @attribute [StreamRendering]
 @inject NavigationManager NavigationManager
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+
+@if (limitCacheDuration)
+{
+    @attribute [Microsoft.AspNetCore.OutputCaching.OutputCache(Duration = 2000)]
+}
 
 <PageTitle>Page for scrolling to hash</PageTitle>
 
@@ -38,6 +44,9 @@
 @code {
     bool showContent;
     string uriOnPageLoad;
+
+    [SupplyParameterFromQuery]
+    public bool limitCacheDuration { get; set; }
 
     protected override async Task OnInitializedAsync()
     {

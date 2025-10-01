@@ -34,6 +34,7 @@ public class Program
             ["Blazor web with server-side blazor root component"] = (BuildWebHost<RazorComponentEndpointsStartup<Root>>(CreateAdditionalArgs(args)), "/subdir"),
             ["Blazor web with server-side reconnection disabled"] = (BuildWebHost<RazorComponentEndpointsStartup<Root>>(CreateAdditionalArgs([.. args, "--DisableReconnectionCache", "true"])), "/subdir"),
             ["Blazor web with server-side hybrid cache"] = (BuildWebHost<RazorComponentEndpointsStartup<Root>>(CreateAdditionalArgs([.. args, "--DisableReconnectionCache", "true", "--UseHybridCache", "true"])), "/subdir"),
+            ["Blazor web with server-side output cache"] = (BuildWebHost<RazorComponentEndpointsStartup<Root>>(CreateAdditionalArgs([.. args, "--UseOutputCache", "true"])), "/subdir"),
             ["Hosted client-side blazor"] = (BuildWebHost<ClientStartup>(CreateAdditionalArgs(args)), "/subdir"),
             ["Hot Reload"] = (BuildWebHost<HotReloadStartup>(CreateAdditionalArgs(args)), "/subdir"),
             ["Dev server client-side blazor"] = CreateDevServerHost(CreateAdditionalArgs(args)),

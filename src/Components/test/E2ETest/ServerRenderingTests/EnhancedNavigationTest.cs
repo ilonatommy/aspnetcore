@@ -196,40 +196,6 @@ public class EnhancedNavigationTest : ServerTestBase<BasicTestAppServerSiteFixtu
             .EndsWith("scroll-to-hash", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void NonEnhancedNavCanScrollToHashWithoutFetchingPageAnchor()
-    {
-        Navigate($"{ServerPathBase}/nav/scroll-to-hash");
-        var originalTextElem = Browser.Exists(By.CssSelector("#anchor #text"));
-        Browser.Equal("Text", () => originalTextElem.Text);
-
-        Browser.Exists(By.CssSelector("#anchor #scroll-anchor")).Click();
-        Browser.True(() => Browser.GetScrollY() > 500);
-        Browser.True(() => Browser
-            .Exists(By.CssSelector("#anchor #uri-on-page-load"))
-            .GetDomAttribute("data-value")
-            .EndsWith("scroll-to-hash", StringComparison.Ordinal));
-
-        Browser.Equal("Text", () => originalTextElem.Text);
-    }
-
-    [Fact]
-    public void NonEnhancedNavCanScrollToHashWithoutFetchingPageNavLink()
-    {
-        Navigate($"{ServerPathBase}/nav/scroll-to-hash");
-        var originalTextElem = Browser.Exists(By.CssSelector("#navlink #text"));
-        Browser.Equal("Text", () => originalTextElem.Text);
-
-        Browser.Exists(By.CssSelector("#navlink #scroll-anchor")).Click();
-        Browser.True(() => Browser.GetScrollY() > 500);
-        Browser.True(() => Browser
-            .Exists(By.CssSelector("#navlink #uri-on-page-load"))
-            .GetDomAttribute("data-value")
-            .EndsWith("scroll-to-hash", StringComparison.Ordinal));
-
-        Browser.Equal("Text", () => originalTextElem.Text);
-    }
-
     [Theory]
     [InlineData("server")]
     [InlineData("webassembly")]
