@@ -487,6 +487,14 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             itemsBefore = Math.Max(0, _itemCount - visibleItemCapacity);
         }
 
+        // Prevent flickering: only reduce visibleItemCapacity if the reduction is significant (more than 1 item).
+        // This prevents oscillation caused by small changes in average item height calculations.
+        // Always allow increases to ensure we render enough items.
+        if (visibleItemCapacity < _visibleItemCapacity && _visibleItemCapacity - visibleItemCapacity <= 1)
+        {
+            visibleItemCapacity = _visibleItemCapacity;
+        }
+
         // If anything about the offset changed, re-render
         if (itemsBefore != _itemsBefore || visibleItemCapacity != _visibleItemCapacity || unusedItemCapacity != _unusedItemCapacity)
         {
