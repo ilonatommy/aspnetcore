@@ -1,0 +1,39 @@
+<p>
+    Variable Height Items (small container):<br />
+    <div id="variable-height-container" style="background-color: #eee; height: 100px; overflow-y: auto">
+        <Virtualize Items="@variableHeightItems" ItemSize="30">
+            <div @key="context.Index" id="variable-item-@context.Index" class="variable-height-item" 
+                 style="height: @(context.Height)px; background-color: hsl(@(context.Hue), 70%, 80%); padding: 4px; box-sizing: border-box;">
+                <span class="item-index">@context.Index</span>
+            </div>
+        </Virtualize>
+    </div>
+</p>
+
+<p>
+    <span id="total-item-count">Total items: @variableHeightItems.Count</span>
+</p>
+
+@code {
+    ICollection<VariableHeightItem> variableHeightItems;
+
+    protected override void OnInitialized()
+    {
+        // Generate 15 items with deterministic variable heights
+        // Heights: 20, 40, 25, 50, 30, 35, 45, 22, 38, 28, 42, 32, 48, 26, 36
+        var heights = new int[] { 20, 40, 25, 50, 30, 35, 45, 22, 38, 28, 42, 32, 48, 26, 36 };
+        variableHeightItems = heights.Select((h, i) => new VariableHeightItem
+        {
+            Index = i,
+            Height = h,
+            Hue = i * 24 // Evenly distributed hues for visual distinction
+        }).ToList();
+    }
+
+    class VariableHeightItem
+    {
+        public int Index { get; set; }
+        public int Height { get; set; }
+        public int Hue { get; set; }
+    }
+}

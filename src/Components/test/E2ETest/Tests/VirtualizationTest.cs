@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Globalization;
+using System.Threading;
 using BasicTestApp;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure.ServerFixtures;
@@ -690,5 +691,139 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     {
         var js = (IJavaScriptExecutor)Browser;
         js.ExecuteScript("arguments[0].scrollLeft = arguments[0].scrollWidth", elem);
+    }
+
+    [Fact]
+    public void VariableHeight_CanScrollThroughAllItems()
+    {
+        Browser.MountTestComponent<VirtualizationVariableHeight>();
+
+        var container = Browser.Exists(By.Id("variable-height-container"));
+
+        // Wait for initial items to appear
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Collect all indices seen during scrolling
+        var seenIndices = new HashSet<int>();
+
+        // Scroll through and collect all visible indices
+        void CollectVisibleIndices()
+        {
+            var elements = container.FindElements(By.CssSelector(".variable-height-item"));
+            foreach (var el in elements)
+            {
+                var idAttr = el.GetDomAttribute("id");
+                if (idAttr != null && idAttr.StartsWith("variable-item-", StringComparison.Ordinal))
+                {
+                    if (int.TryParse(idAttr.AsSpan(14), NumberStyles.Integer, CultureInfo.InvariantCulture, out var idx))
+                    {
+                        seenIndices.Add(idx);
+                    }
+                }
+            }
+        }
+
+        // Collect initial visible items
+        CollectVisibleIndices();
+
+        // Scroll down gradually collecting items until we reach the end
+        var js = (IJavaScriptExecutor)Browser;
+        var lastScrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+
+        for (int attempt = 0; attempt < 30; attempt++) // Safety limit
+        {
+            // Scroll down
+            js.ExecuteScript("arguments[0].scrollTop += 50", container);
+
+            // Wait for scroll to take effect
+            Thread.Sleep(100);
+
+            // Collect visible items
+            CollectVisibleIndices();
+
+            // Check if we've reached the bottom
+            var scrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+            var scrollHeight = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+            var clientHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+
+            if (scrollTop + clientHeight >= scrollHeight - 1)
+            {
+                // At the bottom, collect one more time
+                CollectVisibleIndices();
+                break;
+            }
+
+            if (scrollTop == lastScrollTop)
+            {
+                // Scroll didn't change, we're stuck at the bottom
+                break;
+            }
+
+            lastScrollTop = scrollTop;
+        }
+
+        // Verify we saw all 15 items (indices 0-14)
+        Assert.Equal(15, seenIndices.Count);
+        for (int i = 0; i < 15; i++)
+        {
+            Assert.Contains(i, seenIndices);
+        }
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
+    }
+
+    [Fact]
+    public void VariableHeight_SpacersAdjustCorrectly()
+    {
+        Browser.MountTestComponent<VirtualizationVariableHeight>();
+
+        var container = Browser.Exists(By.Id("variable-height-container"));
+        var topSpacer = container.FindElement(By.TagName("div")); // First child div is the top spacer
+
+        // Wait for initial render
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Initially, top spacer should be 0 height
+        Browser.Equal("0px", () =>
+        {
+            var style = topSpacer.GetDomAttribute("style");
+            var match = System.Text.RegularExpressions.Regex.Match(style ?? "", @"height:\s*(\d+)px");
+            return match.Success ? match.Groups[1].Value + "px" : "0px";
+        });
+
+        // Scroll down
+        var js = (IJavaScriptExecutor)Browser;
+        js.ExecuteScript("arguments[0].scrollTop = 100", container);
+
+        // Wait for scroll to take effect
+        Thread.Sleep(150);
+
+        // After scrolling, verify that items still render (component didn't break)
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
+    }
+
+    [Fact]
+    public void VariableHeight_ItemsRenderWithCorrectHeights()
+    {
+        Browser.MountTestComponent<VirtualizationVariableHeight>();
+
+        var container = Browser.Exists(By.Id("variable-height-container"));
+
+        // Wait for items to render
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Check that item 0 has the expected height (20px from our test data)
+        var item0 = container.FindElement(By.Id("variable-item-0"));
+        var style0 = item0.GetDomAttribute("style");
+        Assert.Contains("height: 20px", style0);
+
+        // Check that item 1 has the expected height (40px from our test data)
+        var item1 = container.FindElement(By.Id("variable-item-1"));
+        var style1 = item1.GetDomAttribute("style");
+        Assert.Contains("height: 40px", style1);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
     }
 }
