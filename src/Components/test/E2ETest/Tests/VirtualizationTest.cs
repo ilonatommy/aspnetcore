@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Globalization;
-using System.Threading;
 using BasicTestApp;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure.ServerFixtures;
@@ -733,10 +732,17 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         for (int attempt = 0; attempt < 30; attempt++) // Safety limit
         {
             // Scroll down
+            var targetScrollTop = lastScrollTop + 50;
             js.ExecuteScript("arguments[0].scrollTop += 50", container);
 
-            // Wait for scroll to take effect
-            Thread.Sleep(100);
+            // Wait for scroll to take effect by checking scroll position changed or we're at bottom
+            Browser.True(() =>
+            {
+                var currentScrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+                var scrollHeight = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+                var clientHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+                return currentScrollTop != lastScrollTop || currentScrollTop + clientHeight >= scrollHeight - 1;
+            });
 
             // Collect visible items
             CollectVisibleIndices();
@@ -796,7 +802,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         js.ExecuteScript("arguments[0].scrollTop = 100", container);
 
         // Wait for scroll to take effect
-        Thread.Sleep(150);
+        Browser.True(() => (long)js.ExecuteScript("return arguments[0].scrollTop", container) >= 100);
 
         // After scrolling, verify that items still render (component didn't break)
         Browser.True(() => GetVisibleItemCount() > 0);
@@ -825,5 +831,88 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Assert.Contains("height: 40px", style1);
 
         int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
+    }
+
+    [Fact]
+    public void DynamicContent_ItemHeightChangesUpdateLayout()
+    {
+        // Test that when an item's height changes (e.g., accordion expand, image load),
+        // items below move down appropriately and state is preserved after scrolling
+        Browser.MountTestComponent<VirtualizationDynamicContent>();
+
+        var container = Browser.Exists(By.Id("scroll-container"));
+        var js = (IJavaScriptExecutor)Browser;
+        var status = Browser.Exists(By.Id("status"));
+
+        // Wait for items to render
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Get position of item 3 before expansion
+        var item3TopBefore = container.FindElement(By.CssSelector("[data-index='3']")).Location.Y;
+
+        // Expand item 2
+        Browser.Exists(By.Id("expand-item-2")).Click();
+        Browser.Equal("Item 2 expanded via button", () => status.Text);
+
+        // Verify item 2 now has expanded content
+        var item2 = container.FindElement(By.CssSelector("[data-index='2']"));
+        Assert.Single(item2.FindElements(By.CssSelector(".expanded-content")));
+
+        // Verify item 3 moved down (not overlapping with expanded item 2)
+        var item3TopAfter = container.FindElement(By.CssSelector("[data-index='3']")).Location.Y;
+        Assert.True(item3TopAfter > item3TopBefore,
+            $"Item 3 should have moved down after item 2 expanded. Before: {item3TopBefore}, After: {item3TopAfter}");
+
+        // Scroll down and back up to verify state is preserved
+        js.ExecuteScript("arguments[0].scrollTop = 200", container);
+        Browser.True(() => (long)js.ExecuteScript("return arguments[0].scrollTop", container) >= 200);
+
+        js.ExecuteScript("arguments[0].scrollTop = 0", container);
+        Browser.True(() => (long)js.ExecuteScript("return arguments[0].scrollTop", container) == 0);
+
+        // Verify item 2 is still expanded after scrolling
+        item2 = container.FindElement(By.CssSelector("[data-index='2']"));
+        Assert.Single(item2.FindElements(By.CssSelector(".expanded-content")));
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".item")).Count;
+    }
+
+    [Fact]
+    public void DynamicContent_ExpandingOffScreenItemDoesNotAffectVisibleItems()
+    {
+        // Test that expanding an item that is scrolled out of view
+        // does not cause visible items to jump or change position
+        Browser.MountTestComponent<VirtualizationDynamicContent>();
+
+        var container = Browser.Exists(By.Id("scroll-container"));
+        var js = (IJavaScriptExecutor)Browser;
+        var status = Browser.Exists(By.Id("status"));
+
+        // Wait for items to render
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Scroll down so item 2 is not visible (items are 50px each, scroll past item 2)
+        js.ExecuteScript("arguments[0].scrollTop = 200", container);
+        Browser.True(() => (long)js.ExecuteScript("return arguments[0].scrollTop", container) >= 200);
+
+        // Get the position of a visible item before expanding the off-screen item
+        var visibleItems = container.FindElements(By.CssSelector(".item"));
+        var firstVisibleItem = visibleItems.First();
+        var firstVisibleTopBefore = firstVisibleItem.Location.Y;
+        var firstVisibleIndex = firstVisibleItem.GetDomAttribute("data-index");
+
+        // Expand item 2 (which should be above the visible area)
+        Browser.Exists(By.Id("expand-item-2")).Click();
+        Browser.Equal("Item 2 expanded via button", () => status.Text);
+
+        // Verify the visible item position didn't change
+        var sameItem = container.FindElement(By.CssSelector($"[data-index='{firstVisibleIndex}']"));
+        var firstVisibleTopAfter = sameItem.Location.Y;
+
+        // The visible items should stay in place (or very close, allowing for minor reflow)
+        Assert.True(Math.Abs(firstVisibleTopAfter - firstVisibleTopBefore) < 5,
+            $"Visible item should not have moved when off-screen item expanded. Before: {firstVisibleTopBefore}, After: {firstVisibleTopAfter}");
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".item")).Count;
     }
 }
