@@ -915,4 +915,43 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         int GetVisibleItemCount() => container.FindElements(By.CssSelector(".item")).Count;
     }
+
+    [Fact]
+    public void VariableHeight_ContainerResizeWorks()
+    {
+        // Tests container resize: resize works, scrolling works after resize
+        Browser.MountTestComponent<VirtualizationVariableHeight>();
+
+        var container = Browser.Exists(By.Id("variable-height-container"));
+        var resizeStatus = Browser.Exists(By.Id("resize-status"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        // Wait for initial render at 100px
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Resize to large (400px)
+        Browser.Exists(By.Id("resize-large")).Click();
+        Browser.Equal("Container resized to 400px", () => resizeStatus.Text);
+
+        // Verify container resized
+        var containerHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+        Assert.Equal(400, containerHeight);
+
+        // Scroll to end and verify last item
+        js.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", container);
+        Browser.True(() => container.FindElements(By.Id("variable-item-49")).Count > 0);
+
+        // Resize to small while scrolled - should still work
+        Browser.Exists(By.Id("resize-small")).Click();
+        Browser.Equal("Container resized to 100px", () => resizeStatus.Text);
+        containerHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+        Assert.Equal(100, containerHeight);
+
+        // Scroll to top and verify first item
+        js.ExecuteScript("arguments[0].scrollTop = 0", container);
+        Browser.True(() => (long)js.ExecuteScript("return arguments[0].scrollTop", container) == 0);
+        Browser.True(() => container.FindElements(By.Id("variable-item-0")).Count > 0);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
+    }
 }
