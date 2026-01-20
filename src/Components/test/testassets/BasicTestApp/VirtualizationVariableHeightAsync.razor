@@ -4,6 +4,9 @@
     <button id="refresh-data" @onclick="() => virtualizeRef.RefreshDataAsync()">Refresh data</button>
     <button id="add-item-start" @onclick="AddItemAtStart">Add at start</button>
     <button id="remove-item-middle" @onclick="RemoveItemFromMiddle">Remove from middle</button>
+    <button id="set-count-0" @onclick="() => SetItemCount(0)">Set 0 items</button>
+    <button id="set-count-1" @onclick="() => SetItemCount(1)">Set 1 item</button>
+    <button id="set-count-5" @onclick="() => SetItemCount(5)">Set 5 items</button>
     <span id="load-count">Loads: @loadCount</span>
     <span id="cancellation-count">Cancellations: @cancellationCount</span>
     <span id="total-item-count">Total: @totalItemCount</span>
@@ -121,6 +124,19 @@
                 allItems[i].Index = i;
             }
         }
+    }
+
+    void SetItemCount(int count)
+    {
+        // Generate new items with variable heights for small count scenarios
+        allItems = Enumerable.Range(0, count).Select(i => new VariableHeightItem
+        {
+            Id = nextId++,
+            Index = i,
+            Height = 30 + (i * 17 % 41), // Heights vary from 30-70px
+            Hue = i * 72 % 360
+        }).ToList();
+        totalItemCount = count;
     }
 
     class VariableHeightItem

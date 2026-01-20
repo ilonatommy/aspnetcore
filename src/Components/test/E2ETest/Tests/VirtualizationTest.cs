@@ -1121,4 +1121,64 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         int GetItemCount() => container.FindElements(By.CssSelector(".async-variable-item")).Count;
         int GetPlaceholderCount() => container.FindElements(By.CssSelector(".async-variable-placeholder")).Count;
     }
+
+    [Fact]
+    public void VariableHeightAsync_SmallItemCountsWork()
+    {
+        Browser.MountTestComponent<VirtualizationVariableHeightAsync>();
+
+        var container = Browser.Exists(By.Id("async-variable-container"));
+        var finishLoadingButton = Browser.Exists(By.Id("finish-loading"));
+        var setCount0Button = Browser.Exists(By.Id("set-count-0"));
+        var setCount1Button = Browser.Exists(By.Id("set-count-1"));
+        var setCount5Button = Browser.Exists(By.Id("set-count-5"));
+        var refreshButton = Browser.Exists(By.Id("refresh-data"));
+        var totalItemCount = Browser.Exists(By.Id("total-item-count"));
+
+        // Load initial items
+        finishLoadingButton.Click();
+        Browser.True(() => GetItemCount() > 0);
+        Browser.Equal("Total: 30", () => totalItemCount.Text);
+
+        // Test empty list (0 items) - should show EmptyContent
+        setCount0Button.Click();
+        Browser.Equal("Total: 0", () => totalItemCount.Text);
+        refreshButton.Click();
+        finishLoadingButton.Click();
+        Browser.Equal(0, GetItemCount);
+        Browser.Exists(By.Id("no-data")); // EmptyContent should be visible
+
+        // Test single item (1 item)
+        setCount1Button.Click();
+        Browser.Equal("Total: 1", () => totalItemCount.Text);
+        refreshButton.Click();
+        finishLoadingButton.Click();
+        Browser.Equal(1, GetItemCount);
+        Browser.DoesNotExist(By.Id("no-data")); // EmptyContent should NOT be visible
+        var singleItem = container.FindElement(By.Id("async-variable-item-0"));
+        Assert.Contains("height: 30px", singleItem.GetDomAttribute("style")); // 30 + 0*17%41 = 30px
+
+        // Test 5 items - all should fit without virtualization
+        setCount5Button.Click();
+        Browser.Equal("Total: 5", () => totalItemCount.Text);
+        refreshButton.Click();
+        finishLoadingButton.Click();
+        Browser.Equal(5, GetItemCount);
+        Browser.DoesNotExist(By.Id("no-data"));
+
+        // Verify all 5 items have variable heights (30 + i*17%41)
+        var item0 = container.FindElement(By.Id("async-variable-item-0"));
+        var item1 = container.FindElement(By.Id("async-variable-item-1"));
+        var item2 = container.FindElement(By.Id("async-variable-item-2"));
+        var item3 = container.FindElement(By.Id("async-variable-item-3"));
+        var item4 = container.FindElement(By.Id("async-variable-item-4"));
+
+        Assert.Contains("height: 30px", item0.GetDomAttribute("style")); // 30 + 0*17%41 = 30
+        Assert.Contains("height: 47px", item1.GetDomAttribute("style")); // 30 + 1*17%41 = 47
+        Assert.Contains("height: 64px", item2.GetDomAttribute("style")); // 30 + 2*34%41 = 64 (34%41=34)
+        Assert.Contains("height: 40px", item3.GetDomAttribute("style")); // 30 + 3*51%41 = 30 + 10 = 40
+        Assert.Contains("height: 57px", item4.GetDomAttribute("style")); // 30 + 4*68%41 = 30 + 27 = 57
+
+        int GetItemCount() => container.FindElements(By.CssSelector(".async-variable-item")).Count;
+    }
 }
