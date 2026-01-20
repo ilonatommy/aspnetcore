@@ -7,10 +7,12 @@
     <button id="set-count-0" @onclick="() => SetItemCount(0)">Set 0 items</button>
     <button id="set-count-1" @onclick="() => SetItemCount(1)">Set 1 item</button>
     <button id="set-count-5" @onclick="() => SetItemCount(5)">Set 5 items</button>
+    <button id="toggle-rtl" @onclick="ToggleRtl">Toggle RTL</button>
+    <span id="direction-status">Direction: @(isRtl ? "RTL" : "LTR")</span>
     <span id="load-count">Loads: @loadCount</span>
     <span id="cancellation-count">Cancellations: @cancellationCount</span>
     <span id="total-item-count">Total: @totalItemCount</span>
-    <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto">
+    <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto; direction: @(isRtl ? "rtl" : "ltr")">
         <Virtualize @ref="virtualizeRef" ItemsProvider="GetItemsAsync" ItemSize="35">
             <ItemContent>
                 <div @key="context.Id" id="async-variable-item-@context.Index" class="async-variable-item" 
@@ -37,10 +39,16 @@
     int totalItemCount = 30;
     int loadCount = 0;
     int cancellationCount = 0;
+    bool isRtl = false;
 
     // Pre-generate all items for consistency
     List<VariableHeightItem> allItems;
     int nextId = 0;
+
+    void ToggleRtl()
+    {
+        isRtl = !isRtl;
+    }
 
     protected override void OnInitialized()
     {

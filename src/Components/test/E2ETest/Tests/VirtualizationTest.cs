@@ -1011,15 +1011,25 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         int GetPlaceholderCount() => container.FindElements(By.CssSelector(".async-variable-placeholder")).Count;
     }
 
-    [Fact]
-    public void VariableHeightAsync_CanScrollThroughItems()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void VariableHeightAsync_CanScrollThroughItems(bool useRtl)
     {
-        // Tests that scrolling works with async variable-height items
+        // Tests that scrolling works with async variable-height items in LTR and RTL layouts
         Browser.MountTestComponent<VirtualizationVariableHeightAsync>();
 
         var container = Browser.Exists(By.Id("async-variable-container"));
         var finishLoadingButton = Browser.Exists(By.Id("finish-loading"));
         var js = (IJavaScriptExecutor)Browser;
+
+        // Set RTL if requested
+        if (useRtl)
+        {
+            var toggleRtlButton = Browser.Exists(By.Id("toggle-rtl"));
+            toggleRtlButton.Click();
+            Browser.Equal("Direction: RTL", () => Browser.Exists(By.Id("direction-status")).Text);
+        }
 
         // Load initial items
         finishLoadingButton.Click();
