@@ -1,0 +1,96 @@
+<p>
+    Variable Height Items with Async ItemsProvider:<br />
+    <button id="finish-loading" @onclick="FinishLoading">Finish loading</button>
+    <button id="refresh-data" @onclick="() => virtualizeRef.RefreshDataAsync()">Refresh data</button>
+    <span id="load-count">Loads: @loadCount</span>
+    <span id="cancellation-count">Cancellations: @cancellationCount</span>
+    <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto">
+        <Virtualize @ref="virtualizeRef" ItemsProvider="GetItemsAsync" ItemSize="35">
+            <ItemContent>
+                <div @key="context.Index" id="async-variable-item-@context.Index" class="async-variable-item" 
+                     style="height: @(context.Height)px; background-color: hsl(@(context.Hue), 70%, 80%); padding: 4px; box-sizing: border-box;">
+                    <span class="item-index">@context.Index</span> - Height: @context.Height px
+                </div>
+            </ItemContent>
+            <Placeholder>
+                <div id="async-variable-placeholder-@context.Index" class="async-variable-placeholder" 
+                     style="height: @(context.Size)px; background-color: #ccc; padding: 4px; box-sizing: border-box;">
+                    Loading @context.Index...
+                </div>
+            </Placeholder>
+            <EmptyContent>
+                <p id="no-data">No data to show</p>
+            </EmptyContent>
+        </Virtualize>
+    </div>
+</p>
+
+<p>
+    <span id="total-item-count">Total items: @totalItemCount</span>
+</p>
+
+@code {
+    Virtualize<VariableHeightItem> virtualizeRef;
+    TaskCompletionSource loadingTcs = new TaskCompletionSource();
+    int totalItemCount = 30;
+    int loadCount = 0;
+    int cancellationCount = 0;
+
+    // Pre-generate all items for consistency
+    List<VariableHeightItem> allItems;
+
+    protected override void OnInitialized()
+    {
+        // Generate 30 items with deterministic variable heights (25-55px range)
+        allItems = Enumerable.Range(0, totalItemCount).Select(i => new VariableHeightItem
+        {
+            Index = i,
+            Height = 25 + (i * 11 % 31), // Heights vary from 25-55px
+            Hue = i * 12 % 360
+        }).ToList();
+    }
+
+    async ValueTask<ItemsProviderResult<VariableHeightItem>> GetItemsAsync(ItemsProviderRequest request)
+    {
+        var registration = request.CancellationToken.Register(() =>
+        {
+            loadingTcs.TrySetCanceled(request.CancellationToken);
+            loadingTcs = new TaskCompletionSource();
+            cancellationCount++;
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            await loadingTcs.Task;
+        }
+        catch (OperationCanceledException)
+        {
+            registration.Dispose();
+            throw;
+        }
+
+        registration.Dispose();
+        loadCount++;
+
+        var items = allItems
+            .Skip(request.StartIndex)
+            .Take(request.Count)
+            .ToList();
+
+        return new ItemsProviderResult<VariableHeightItem>(items, totalItemCount);
+    }
+
+    void FinishLoading()
+    {
+        loadingTcs.TrySetResult();
+        loadingTcs = new TaskCompletionSource();
+    }
+
+    class VariableHeightItem
+    {
+        public int Index { get; set; }
+        public int Height { get; set; }
+        public int Hue { get; set; }
+    }
+}
