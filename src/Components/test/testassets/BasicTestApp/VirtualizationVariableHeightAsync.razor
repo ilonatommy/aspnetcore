@@ -2,12 +2,15 @@
     Variable Height Items with Async ItemsProvider:<br />
     <button id="finish-loading" @onclick="FinishLoading">Finish loading</button>
     <button id="refresh-data" @onclick="() => virtualizeRef.RefreshDataAsync()">Refresh data</button>
+    <button id="add-item-start" @onclick="AddItemAtStart">Add at start</button>
+    <button id="remove-item-middle" @onclick="RemoveItemFromMiddle">Remove from middle</button>
     <span id="load-count">Loads: @loadCount</span>
     <span id="cancellation-count">Cancellations: @cancellationCount</span>
+    <span id="total-item-count">Total: @totalItemCount</span>
     <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto">
         <Virtualize @ref="virtualizeRef" ItemsProvider="GetItemsAsync" ItemSize="35">
             <ItemContent>
-                <div @key="context.Index" id="async-variable-item-@context.Index" class="async-variable-item" 
+                <div @key="context.Id" id="async-variable-item-@context.Index" class="async-variable-item" 
                      style="height: @(context.Height)px; background-color: hsl(@(context.Hue), 70%, 80%); padding: 4px; box-sizing: border-box;">
                     <span class="item-index">@context.Index</span> - Height: @context.Height px
                 </div>
@@ -34,12 +37,14 @@
 
     // Pre-generate all items for consistency
     List<VariableHeightItem> allItems;
+    int nextId = 0;
 
     protected override void OnInitialized()
     {
         // Generate 30 items with deterministic variable heights (25-55px range)
         allItems = Enumerable.Range(0, totalItemCount).Select(i => new VariableHeightItem
         {
+            Id = nextId++,
             Index = i,
             Height = 25 + (i * 11 % 31), // Heights vary from 25-55px
             Hue = i * 12 % 360
@@ -83,8 +88,44 @@
         loadingTcs = new TaskCompletionSource();
     }
 
+    void AddItemAtStart()
+    {
+        // Insert at start - this shifts ALL indices up
+        var newItem = new VariableHeightItem
+        {
+            Id = nextId++, // Unique ID
+            Index = -1, // Will be recalculated
+            Height = 100, // Distinctive height
+            Hue = 0 // Red
+        };
+        allItems.Insert(0, newItem);
+        totalItemCount++;
+        // Recalculate indices for all items
+        for (int i = 0; i < allItems.Count; i++)
+        {
+            allItems[i].Index = i;
+        }
+    }
+
+    void RemoveItemFromMiddle()
+    {
+        // Remove from middle - this shifts indices after the removal point
+        if (totalItemCount > 2)
+        {
+            int middleIndex = totalItemCount / 2;
+            allItems.RemoveAt(middleIndex);
+            totalItemCount--;
+            // Recalculate indices for remaining items
+            for (int i = 0; i < allItems.Count; i++)
+            {
+                allItems[i].Index = i;
+            }
+        }
+    }
+
     class VariableHeightItem
     {
+        public int Id { get; set; }
         public int Index { get; set; }
         public int Height { get; set; }
         public int Hue { get; set; }

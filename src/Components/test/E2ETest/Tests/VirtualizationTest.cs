@@ -1052,4 +1052,73 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         int GetItemCount() => container.FindElements(By.CssSelector(".async-variable-item")).Count;
         int GetPlaceholderCount() => container.FindElements(By.CssSelector(".async-variable-placeholder")).Count;
     }
+
+    [Fact]
+    public void VariableHeightAsync_CollectionMutationWorks()
+    {
+        Browser.MountTestComponent<VirtualizationVariableHeightAsync>();
+
+        var container = Browser.Exists(By.Id("async-variable-container"));
+        var finishLoadingButton = Browser.Exists(By.Id("finish-loading"));
+        var addItemStartButton = Browser.Exists(By.Id("add-item-start"));
+        var removeItemMiddleButton = Browser.Exists(By.Id("remove-item-middle"));
+        var refreshButton = Browser.Exists(By.Id("refresh-data"));
+        var totalItemCount = Browser.Exists(By.Id("total-item-count"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        // Load initial items
+        finishLoadingButton.Click();
+        Browser.True(() => GetItemCount() > 0);
+        Browser.Equal("Total: 30", () => totalItemCount.Text);
+
+        // Verify initial first item height (25 + 0*11%31 = 25px)
+        var firstItem = container.FindElement(By.Id("async-variable-item-0"));
+        Assert.Contains("height: 25px", firstItem.GetDomAttribute("style"));
+
+        // Add item at START - this shifts ALL existing indices up
+        // The new item has a distinctive 100px height
+        addItemStartButton.Click();
+        Browser.Equal("Total: 31", () => totalItemCount.Text);
+
+        // Refresh to see the change
+        refreshButton.Click();
+        finishLoadingButton.Click();
+
+        // The new item 0 should have the distinctive 100px height
+        firstItem = container.FindElement(By.Id("async-variable-item-0"));
+        Assert.Contains("height: 100px", firstItem.GetDomAttribute("style"));
+
+        // The old first item is now item 1 and should still have its original 25px height
+        var secondItem = container.FindElement(By.Id("async-variable-item-1"));
+        Assert.Contains("height: 25px", secondItem.GetDomAttribute("style"));
+
+        // Remove item from MIDDLE - this shifts indices after the removed item
+        removeItemMiddleButton.Click();
+        Browser.Equal("Total: 30", () => totalItemCount.Text);
+
+        // Refresh
+        refreshButton.Click();
+        finishLoadingButton.Click();
+
+        // Scroll to bottom and back to verify everything still works
+        js.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", container);
+        if (GetPlaceholderCount() > 0)
+        {
+            finishLoadingButton.Click();
+        }
+        Browser.True(() => container.FindElements(By.Id("async-variable-item-29")).Count > 0);
+
+        js.ExecuteScript("arguments[0].scrollTop = 0", container);
+        if (GetPlaceholderCount() > 0)
+        {
+            finishLoadingButton.Click();
+        }
+
+        // First item should still be the 100px tall item we added
+        firstItem = container.FindElement(By.Id("async-variable-item-0"));
+        Assert.Contains("height: 100px", firstItem.GetDomAttribute("style"));
+
+        int GetItemCount() => container.FindElements(By.CssSelector(".async-variable-item")).Count;
+        int GetPlaceholderCount() => container.FindElements(By.CssSelector(".async-variable-placeholder")).Count;
+    }
 }
