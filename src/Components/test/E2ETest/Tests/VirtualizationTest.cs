@@ -740,14 +740,16 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         CollectVisibleIndices();
 
         // Scroll down gradually collecting items until we reach the end
+        // With extreme height variance (20-2000px items), we need larger scroll increments
+        // to cover the total content height efficiently
         var js = (IJavaScriptExecutor)Browser;
         var lastScrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
 
-        for (int attempt = 0; attempt < 30; attempt++) // Safety limit
+        for (int attempt = 0; attempt < 200; attempt++) // Safety limit - more iterations for large content
         {
-            // Scroll down
-            var targetScrollTop = lastScrollTop + 50;
-            js.ExecuteScript("arguments[0].scrollTop += 50", container);
+            // Scroll down - use 500px increments to cover large content height faster
+            var targetScrollTop = lastScrollTop + 500;
+            js.ExecuteScript("arguments[0].scrollTop += 500", container);
 
             // Wait for scroll to take effect by checking scroll position changed or we're at bottom
             Browser.True(() =>
@@ -781,6 +783,17 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
             lastScrollTop = scrollTop;
         }
+
+        // Final scroll to absolute bottom and collect any remaining items
+        js.ExecuteScript("arguments[0].scrollTop = arguments[0].scrollHeight", container);
+        Browser.True(() =>
+        {
+            var scrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+            var scrollHeight = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+            var clientHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+            return scrollTop + clientHeight >= scrollHeight - 1;
+        });
+        CollectVisibleIndices();
 
         // Verify we saw all 50 items (indices 0-49)
         Assert.Equal(50, seenIndices.Count);
@@ -834,15 +847,15 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         // Wait for items to render
         Browser.True(() => GetVisibleItemCount() > 0);
 
-        // Check that item 0 has the expected height (20px from our test data: 20 + (0*7%31) = 20)
+        // Check that item 0 has the expected height (20px from our test data: 20 + (0*37%181) = 20)
         var item0 = container.FindElement(By.Id("variable-item-0"));
         var style0 = item0.GetDomAttribute("style");
         Assert.Contains("height: 20px", style0);
 
-        // Check that item 1 has the expected height (27px from our test data: 20 + (1*7%31) = 27)
+        // Check that item 1 has the expected height (57px from our test data: 20 + (1*37%181) = 57)
         var item1 = container.FindElement(By.Id("variable-item-1"));
         var style1 = item1.GetDomAttribute("style");
-        Assert.Contains("height: 27px", style1);
+        Assert.Contains("height: 57px", style1);
 
         int GetVisibleItemCount() => container.FindElements(By.CssSelector(".variable-height-item")).Count;
     }

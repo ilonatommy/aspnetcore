@@ -25,10 +25,6 @@
     </div>
 </p>
 
-<p>
-    <span id="total-item-count">Total items: @totalItemCount</span>
-</p>
-
 @code {
     Virtualize<VariableHeightItem> virtualizeRef;
     TaskCompletionSource loadingTcs = new TaskCompletionSource();

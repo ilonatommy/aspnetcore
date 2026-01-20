@@ -36,11 +36,11 @@
 
     protected override void OnInitialized()
     {
-        // Generate 50 items with deterministic variable heights (20-50px range)
+        // Generate 50 items with extreme height variance (20-2000px range = 100x variance)
         variableHeightItems = Enumerable.Range(0, 50).Select(i => new VariableHeightItem
         {
             Index = i,
-            Height = 20 + (i * 7 % 31), // Heights cycle through 20-50px range
+            Height = 20 + (i * 37 % 1981), // Heights vary from 20-2000px (100x extreme variance!)
             Hue = i * 7 % 360 // Evenly distributed hues for visual distinction
         }).ToList();
     }
