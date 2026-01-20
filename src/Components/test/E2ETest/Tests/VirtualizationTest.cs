@@ -1012,11 +1012,13 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void VariableHeightAsync_CanScrollThroughItems(bool useRtl)
+    [InlineData(false, 100)]
+    [InlineData(true, 100)]
+    [InlineData(false, 200)]
+    [InlineData(false, 50)]
+    public void VariableHeightAsync_CanScrollThroughItems(bool useRtl, int zoomPercent)
     {
-        // Tests that scrolling works with async variable-height items in LTR and RTL layouts
+        // Tests that scrolling works with async variable-height items in LTR/RTL layouts and various zoom levels
         Browser.MountTestComponent<VirtualizationVariableHeightAsync>();
 
         var container = Browser.Exists(By.Id("async-variable-container"));
@@ -1029,6 +1031,15 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             var toggleRtlButton = Browser.Exists(By.Id("toggle-rtl"));
             toggleRtlButton.Click();
             Browser.Equal("Direction: RTL", () => Browser.Exists(By.Id("direction-status")).Text);
+        }
+
+        // Set zoom level if not 100%
+        if (zoomPercent != 100)
+        {
+            var zoomButtonId = $"zoom-{zoomPercent}";
+            var zoomButton = Browser.Exists(By.Id(zoomButtonId));
+            zoomButton.Click();
+            Browser.Equal($"Zoom: {zoomPercent}%", () => Browser.Exists(By.Id("zoom-status")).Text);
         }
 
         // Load initial items

@@ -8,11 +8,15 @@
     <button id="set-count-1" @onclick="() => SetItemCount(1)">Set 1 item</button>
     <button id="set-count-5" @onclick="() => SetItemCount(5)">Set 5 items</button>
     <button id="toggle-rtl" @onclick="ToggleRtl">Toggle RTL</button>
+    <button id="zoom-150" @onclick="() => SetZoom(1.5)">Zoom 150%</button>
+    <button id="zoom-75" @onclick="() => SetZoom(0.75)">Zoom 75%</button>
+    <button id="zoom-100" @onclick="() => SetZoom(1.0)">Zoom 100%</button>
     <span id="direction-status">Direction: @(isRtl ? "RTL" : "LTR")</span>
+    <span id="zoom-status">Zoom: @(zoomLevel * 100)%</span>
     <span id="load-count">Loads: @loadCount</span>
     <span id="cancellation-count">Cancellations: @cancellationCount</span>
     <span id="total-item-count">Total: @totalItemCount</span>
-    <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto; direction: @(isRtl ? "rtl" : "ltr")">
+    <div id="async-variable-container" style="background-color: #eee; height: 200px; overflow-y: auto; direction: @(isRtl ? "rtl" : "ltr"); transform: scale(@zoomLevel.ToString(System.Globalization.CultureInfo.InvariantCulture)); transform-origin: top left;">
         <Virtualize @ref="virtualizeRef" ItemsProvider="GetItemsAsync" ItemSize="35">
             <ItemContent>
                 <div @key="context.Id" id="async-variable-item-@context.Index" class="async-variable-item" 
@@ -40,6 +44,7 @@
     int loadCount = 0;
     int cancellationCount = 0;
     bool isRtl = false;
+    double zoomLevel = 1.0;
 
     // Pre-generate all items for consistency
     List<VariableHeightItem> allItems;
@@ -48,6 +53,11 @@
     void ToggleRtl()
     {
         isRtl = !isRtl;
+    }
+
+    void SetZoom(double zoom)
+    {
+        zoomLevel = zoom;
     }
 
     protected override void OnInitialized()
