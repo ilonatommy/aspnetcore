@@ -150,6 +150,12 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     /// <returns>A <see cref="Task"/> representing the completion of the operation.</returns>
     public async Task RefreshDataAsync()
     {
+        // Clear cached measurements so items will be re-measured on next render.
+        // This handles scenarios where item content has changed size (e.g., expandable sections).
+        _measuredHeights.Clear();
+        _averageMeasuredHeight = 0;
+        _measuredItemCount = 0;
+
         // We don't auto-render after this operation because in the typical use case, the
         // host component calls this from one of its lifecycle methods, and will naturally
         // re-render afterwards anyway. It's not desirable to re-render twice.
