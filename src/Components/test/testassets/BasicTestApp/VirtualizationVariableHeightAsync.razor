@@ -8,9 +8,9 @@
     <button id="set-count-1" @onclick="() => SetItemCount(1)">Set 1 item</button>
     <button id="set-count-5" @onclick="() => SetItemCount(5)">Set 5 items</button>
     <button id="toggle-rtl" @onclick="ToggleRtl">Toggle RTL</button>
-    <button id="zoom-150" @onclick="() => SetZoom(1.5)">Zoom 150%</button>
-    <button id="zoom-75" @onclick="() => SetZoom(0.75)">Zoom 75%</button>
+    <button id="zoom-200" @onclick="() => SetZoom(2.0)">Zoom 200%</button>
     <button id="zoom-100" @onclick="() => SetZoom(1.0)">Zoom 100%</button>
+    <button id="zoom-50" @onclick="() => SetZoom(0.5)">Zoom 50%</button>
     <span id="direction-status">Direction: @(isRtl ? "RTL" : "LTR")</span>
     <span id="zoom-status">Zoom: @(zoomLevel * 100)%</span>
     <span id="load-count">Loads: @loadCount</span>
