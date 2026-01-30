@@ -60,8 +60,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     private bool _loading;
 
     // Variable-height virtualization support
-    private readonly Dictionary<int, float> _measuredHeights = new();
-    private float _averageMeasuredHeight;
+    private float _totalMeasuredHeight;
     private int _measuredItemCount;
 
     [Inject]
@@ -117,7 +116,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     /// in the page.
     /// </summary>
     [Parameter]
-    public int OverscanCount { get; set; } = 3;
+    public int OverscanCount { get; set; } = 15;
 
     /// <summary>
     /// Gets or sets the tag name of the HTML element that will be used as the virtualization spacer.
@@ -150,12 +149,6 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     /// <returns>A <see cref="Task"/> representing the completion of the operation.</returns>
     public async Task RefreshDataAsync()
     {
-        // Clear cached measurements so items will be re-measured on next render.
-        // This handles scenarios where item content has changed size (e.g., expandable sections).
-        _measuredHeights.Clear();
-        _averageMeasuredHeight = 0;
-        _measuredItemCount = 0;
-
         // We don't auto-render after this operation because in the typical use case, the
         // host component calls this from one of its lifecycle methods, and will naturally
         // re-render afterwards anyway. It's not desirable to re-render twice.
@@ -311,7 +304,8 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
         }
 
         var height = CalculateTotalHeightForAfter(itemsInSpacer);
-        var gapHeight = _measuredItemCount > 0 ? numItemsGapAbove * _averageMeasuredHeight : numItemsGapAbove * _itemSize;
+        var averageHeight = _measuredItemCount > 0 ? _totalMeasuredHeight / _measuredItemCount : _itemSize;
+        var gapHeight = numItemsGapAbove * averageHeight;
         return $"height: {height.ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0; transform: translateY({gapHeight.ToString(CultureInfo.InvariantCulture)}px);";
     }
 
@@ -333,13 +327,8 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
     private float GetItemHeight(int index)
     {
-        // Use measured height if available, otherwise use average or ItemSize
-        if (_measuredHeights.TryGetValue(index, out var height))
-        {
-            return height;
-        }
-
-        return _measuredItemCount > 0 ? _averageMeasuredHeight : _itemSize;
+        // Use running average of measured heights, or ItemSize if no measurements yet
+        return _measuredItemCount > 0 ? (_totalMeasuredHeight / _measuredItemCount) : _itemSize;
     }
 
     private float CalculateTotalHeight(int startIndex, int count)
@@ -354,17 +343,10 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
     private void RecordMeasurement(int index, float height)
     {
-        if (!_measuredHeights.ContainsKey(index))
-        {
-            _measuredItemCount++;
-        }
-        _measuredHeights[index] = height;
-
-        // Update running average
-        if (_measuredHeights.Count > 0)
-        {
-            _averageMeasuredHeight = _measuredHeights.Values.Sum() / _measuredHeights.Count;
-        }
+        // Update running average with new measurement
+        // We use a simple cumulative average that weights all measurements equally
+        _totalMeasuredHeight += height;
+        _measuredItemCount++;
     }
 
     private void ProcessMeasurements(ItemMeasurement[]? measurements)
@@ -476,7 +458,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
         maxItemCount += OverscanCount * 2;
 
         // Use average measured height for calculations if we have measurements, otherwise use _itemSize
-        var effectiveItemSize = _measuredItemCount > 0 ? _averageMeasuredHeight : _itemSize;
+        var effectiveItemSize = _measuredItemCount > 0 ? _totalMeasuredHeight / _measuredItemCount : _itemSize;
 
         itemsInSpacer = Math.Max(0, (int)Math.Floor(spacerSize / effectiveItemSize) - OverscanCount);
         visibleItemCapacity = (int)Math.Ceiling(containerSize / effectiveItemSize) + 2 * OverscanCount;

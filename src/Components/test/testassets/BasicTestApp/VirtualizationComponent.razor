@@ -1,6 +1,4 @@
-﻿@* Commented out other test sections to focus on Variable Height Items
-
-<p>
+﻿<p>
     Item size:<br />
     <input id="item-size-input" type="number" @bind-value="itemSize" />
 </p>
@@ -66,8 +64,6 @@
     </Virtualize>
 </p>
 
-*@
-
 <p>
     Variable Height Items:<br />
     <div id="variable-height-container" style="background-color: #eee; height: 500px; overflow-y: auto">
@@ -84,7 +80,6 @@
 </p>
 
 @code {
-#pragma warning disable CS0414, CS0169 // Fields are unused because other test sections are commented out
     float itemSize = 100;
     ICollection<int> fixedItems = Enumerable.Range(0, 1000).ToList();
     ICollection<int> emptyCollection = Array.Empty<int>();
@@ -95,7 +90,6 @@
     TaskCompletionSource asyncTcs = new TaskCompletionSource();
 
     Virtualize<int> asyncComponent;
-#pragma warning restore CS0414, CS0169
 
     async ValueTask<ItemsProviderResult<int>> GetItemsAsync(ItemsProviderRequest request)
     {
