@@ -298,44 +298,19 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
     private string GetSpacerStyle(int itemsInSpacer, int numItemsGapAbove)
     {
-        if (numItemsGapAbove == 0)
-        {
-            return GetSpacerStyleForAfter(itemsInSpacer);
-        }
-
-        var height = CalculateTotalHeightForAfter(itemsInSpacer);
-        var averageHeight = _measuredItemCount > 0 ? _totalMeasuredHeight / _measuredItemCount : _itemSize;
-        var gapHeight = numItemsGapAbove * averageHeight;
-        return $"height: {height.ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0; transform: translateY({gapHeight.ToString(CultureInfo.InvariantCulture)}px);";
-    }
-
-    private string GetSpacerStyleForAfter(int itemsInSpacer)
-    {
-        var height = CalculateTotalHeightForAfter(itemsInSpacer);
-        return $"height: {height.ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0;";
-    }
-
-    private float CalculateTotalHeightForAfter(int count)
-    {
-        // Items after the visible area start after _itemsBefore + _visibleItemCapacity
-        var startIndex = _itemsBefore + _visibleItemCapacity;
-        return CalculateTotalHeight(startIndex, count);
+        var avgHeight = GetItemHeight();
+        return numItemsGapAbove == 0
+            ? GetSpacerStyle(itemsInSpacer)
+            : $"height: {(itemsInSpacer * avgHeight).ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0; transform: translateY({(numItemsGapAbove * avgHeight).ToString(CultureInfo.InvariantCulture)}px);";
     }
 
     private string GetSpacerStyle(int itemsInSpacer)
-        => $"height: {CalculateTotalHeight(0, itemsInSpacer).ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0;";
+        => $"height: {(itemsInSpacer * GetItemHeight()).ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0;";
 
     private float GetItemHeight()
     {
         // Use running average of measured heights, or ItemSize if no measurements yet
         return _measuredItemCount > 0 ? (_totalMeasuredHeight / _measuredItemCount) : _itemSize;
-    }
-
-    private float CalculateTotalHeight(int startIndex, int count)
-    {
-        // With running average, all items have the same estimated height
-        var actualCount = Math.Min(count, Math.Max(0, _itemCount - startIndex));
-        return actualCount * GetItemHeight();
     }
 
     private void RecordMeasurement(float height)
@@ -357,28 +332,6 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
         {
             RecordMeasurement(measurement.Height);
         }
-    }
-
-    // Reserved for future use in more sophisticated item distribution calculation
-#pragma warning disable IDE0051 // Remove unused private members
-    private int FindItemCountInHeight(float targetHeight, int startIndex, int maxItems)
-#pragma warning restore IDE0051 // Remove unused private members
-    {
-        float cumulative = 0;
-        int count = 0;
-        var itemHeight = GetItemHeight();
-
-        for (int i = startIndex; i < startIndex + maxItems && i < _itemCount; i++)
-        {
-            if (cumulative + itemHeight > targetHeight)
-            {
-                break;
-            }
-            cumulative += itemHeight;
-            count++;
-        }
-
-        return count;
     }
 
     void IVirtualizeJsCallbacks.OnBeforeSpacerVisible(float spacerSize, float spacerSeparation, float containerSize, ItemMeasurement[]? measurements)
