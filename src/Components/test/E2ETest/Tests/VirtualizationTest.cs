@@ -1202,4 +1202,115 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         int GetItemCount() => container.FindElements(By.CssSelector(".async-variable-item")).Count;
     }
+
+    [Fact]
+    public void DisplayModes_BlockLayout_SupportsVariableHeights()
+    {
+        Browser.MountTestComponent<VirtualizationDisplayModes>();
+
+        var container = Browser.Exists(By.Id("block-container"));
+        var itemCount = Browser.Exists(By.Id("block-count"));
+
+        // Verify items are rendered
+        Browser.Equal("50", () => itemCount.Text);
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Verify variable heights are applied (heights vary from 30-80px based on formula: 30 + i*17%51)
+        var firstItem = container.FindElement(By.Id("block-item-0"));
+        Assert.Contains("height: 30px", firstItem.GetDomAttribute("style")); // 30 + 0*17%51 = 30
+
+        var secondItem = container.FindElement(By.Id("block-item-1"));
+        Assert.Contains("height: 47px", secondItem.GetDomAttribute("style")); // 30 + 1*17%51 = 47
+
+        // Scroll to bottom and verify virtualization works
+        Browser.ExecuteJavaScript("document.getElementById('block-container').scrollTop = document.getElementById('block-container').scrollHeight;");
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".block-item")).Count;
+    }
+
+    [Fact]
+    public void DisplayModes_GridLayout_SupportsVariableHeights()
+    {
+        Browser.MountTestComponent<VirtualizationDisplayModes>();
+
+        var container = Browser.Exists(By.Id("grid-container"));
+        var itemCount = Browser.Exists(By.Id("grid-count"));
+
+        // Verify items are rendered
+        Browser.Equal("50", () => itemCount.Text);
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Verify variable heights are applied
+        var firstItem = container.FindElement(By.Id("grid-item-0"));
+        Assert.Contains("height: 30px", firstItem.GetDomAttribute("style"));
+
+        // Scroll halfway and verify virtualization works
+        Browser.ExecuteJavaScript("document.getElementById('grid-container').scrollTop = document.getElementById('grid-container').scrollHeight * 0.5;");
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Scroll to bottom
+        Browser.ExecuteJavaScript("document.getElementById('grid-container').scrollTop = document.getElementById('grid-container').scrollHeight;");
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".grid-item")).Count;
+    }
+
+    [Fact]
+    public void DisplayModes_SubgridLayout_SupportsVariableHeights()
+    {
+        Browser.MountTestComponent<VirtualizationDisplayModes>();
+
+        var container = Browser.Exists(By.Id("subgrid-container"));
+        var itemCount = Browser.Exists(By.Id("subgrid-count"));
+
+        // Verify items are rendered
+        Browser.Equal("50", () => itemCount.Text);
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        // Verify variable heights are applied
+        var firstItem = container.FindElement(By.Id("subgrid-item-0"));
+        Assert.Contains("height: 30px", firstItem.GetDomAttribute("style"));
+
+        // Scroll and verify virtualization works with subgrid
+        Browser.ExecuteJavaScript("document.getElementById('subgrid-container').scrollTop = document.getElementById('subgrid-container').scrollHeight;");
+        Browser.True(() => GetVisibleItemCount() > 0);
+
+        int GetVisibleItemCount() => container.FindElements(By.CssSelector(".subgrid-item")).Count;
+    }
+
+    [Fact]
+    public void QuickGrid_SupportsVariableHeightRows()
+    {
+        Browser.MountTestComponent<BasicTestApp.QuickGridTest.QuickGridVariableHeightComponent>();
+
+        var container = Browser.Exists(By.Id("grid-variable-height"));
+        var totalItems = Browser.Exists(By.Id("total-items"));
+        var providerCallCount = Browser.Exists(By.Id("items-provider-call-count"));
+
+        // Verify the grid shows correct item count
+        Browser.Equal("Total items: 100", () => totalItems.Text);
+
+        // Verify items provider was called
+        Browser.True(() => int.Parse(providerCallCount.Text.Replace("ItemsProvider calls: ", ""), CultureInfo.InvariantCulture) > 0);
+
+        // Verify rows are rendered in the grid
+        Browser.True(() => GetVisibleRowCount() > 0);
+
+        // Scroll halfway through the grid
+        Browser.ExecuteJavaScript("document.getElementById('grid-variable-height').scrollTop = document.getElementById('grid-variable-height').scrollHeight * 0.5;");
+
+        // Wait for provider to be called again
+        var initialCallCount = int.Parse(providerCallCount.Text.Replace("ItemsProvider calls: ", ""), CultureInfo.InvariantCulture);
+        Browser.True(() => int.Parse(providerCallCount.Text.Replace("ItemsProvider calls: ", ""), CultureInfo.InvariantCulture) > initialCallCount);
+
+        // Verify rows are still visible after scrolling
+        Browser.True(() => GetVisibleRowCount() > 0);
+
+        // Scroll to bottom
+        Browser.ExecuteJavaScript("document.getElementById('grid-variable-height').scrollTop = document.getElementById('grid-variable-height').scrollHeight;");
+        Browser.True(() => GetVisibleRowCount() > 0);
+
+        int GetVisibleRowCount() => container.FindElements(By.CssSelector("tbody tr")).Count;
+    }
 }
