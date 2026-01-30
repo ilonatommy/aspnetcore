@@ -325,7 +325,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     private string GetSpacerStyle(int itemsInSpacer)
         => $"height: {CalculateTotalHeight(0, itemsInSpacer).ToString(CultureInfo.InvariantCulture)}px; flex-shrink: 0;";
 
-    private float GetItemHeight(int index)
+    private float GetItemHeight()
     {
         // Use running average of measured heights, or ItemSize if no measurements yet
         return _measuredItemCount > 0 ? (_totalMeasuredHeight / _measuredItemCount) : _itemSize;
@@ -333,15 +333,12 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
     private float CalculateTotalHeight(int startIndex, int count)
     {
-        float total = 0;
-        for (int i = startIndex; i < startIndex + count && i < _itemCount; i++)
-        {
-            total += GetItemHeight(i);
-        }
-        return total;
+        // With running average, all items have the same estimated height
+        var actualCount = Math.Min(count, Math.Max(0, _itemCount - startIndex));
+        return actualCount * GetItemHeight();
     }
 
-    private void RecordMeasurement(int index, float height)
+    private void RecordMeasurement(float height)
     {
         // Update running average with new measurement
         // We use a simple cumulative average that weights all measurements equally
@@ -358,7 +355,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
         foreach (var measurement in measurements)
         {
-            RecordMeasurement(measurement.Index, measurement.Height);
+            RecordMeasurement(measurement.Height);
         }
     }
 
@@ -369,10 +366,10 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     {
         float cumulative = 0;
         int count = 0;
+        var itemHeight = GetItemHeight();
 
         for (int i = startIndex; i < startIndex + maxItems && i < _itemCount; i++)
         {
-            var itemHeight = GetItemHeight(i);
             if (cumulative + itemHeight > targetHeight)
             {
                 break;
