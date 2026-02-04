@@ -126,20 +126,31 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     return mutationObserver;
   }
 
+  let pendingCallbacks: IntersectionObserverEntry[] = [];
+  let callbackTimeout: ReturnType<typeof setTimeout> | null = null;
+  const throttleMs = 50;
+
   function intersectionCallback(entries: IntersectionObserverEntry[]): void {
+    pendingCallbacks = entries;
+    
+    if (callbackTimeout) {
+      return;
+    }
+
+    callbackTimeout = setTimeout(() => {
+      callbackTimeout = null;
+      processIntersectionEntries(pendingCallbacks);
+    }, throttleMs);
+  }
+
+  function processIntersectionEntries(entries: IntersectionObserverEntry[]): void {
     entries.forEach((entry): void => {
       if (!entry.isIntersecting) {
         return;
       }
 
-      // Measure currently rendered items for variable-height support
       const measurements = measureRenderedItems(spacerBefore, spacerAfter);
 
-      // To compute the ItemSize, work out the separation between the two spacers. We can't just measure an individual element
-      // because each conceptual item could be made from multiple elements. Using getBoundingClientRect allows for the size to be
-      // a fractional value. It's important not to add or subtract any such fractional values (e.g., to subtract the 'top' of
-      // one item from the 'bottom' of another to get the distance between them) because floating point errors would cause
-      // scrolling glitches.
       rangeBetweenSpacers.setStartAfter(spacerBefore);
       rangeBetweenSpacers.setEndBefore(spacerAfter);
       const spacerSeparation = rangeBetweenSpacers.getBoundingClientRect().height;
@@ -148,9 +159,6 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       if (entry.target === spacerBefore) {
         dotNetHelper.invokeMethodAsync('OnSpacerBeforeVisible', entry.intersectionRect.top - entry.boundingClientRect.top, spacerSeparation, containerSize, measurements);
       } else if (entry.target === spacerAfter && spacerAfter.offsetHeight > 0) {
-        // When we first start up, both the "before" and "after" spacers will be visible, but it's only relevant to raise a
-        // single event to load the initial data. To avoid raising two events, skip the one for the "after" spacer if we know
-        // it's meaningless to talk about any overlap into it.
         dotNetHelper.invokeMethodAsync('OnSpacerAfterVisible', entry.boundingClientRect.bottom - entry.intersectionRect.bottom, spacerSeparation, containerSize, measurements);
       }
     });
