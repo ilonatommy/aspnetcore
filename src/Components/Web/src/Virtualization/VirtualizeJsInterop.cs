@@ -24,10 +24,18 @@ internal sealed class VirtualizeJsInterop : IAsyncDisposable
         _jsRuntime = jsRuntime;
     }
 
-    public async ValueTask InitializeAsync(ElementReference spacerBefore, ElementReference spacerAfter)
+    public async ValueTask InitializeAsync(ElementReference spacerBefore, ElementReference spacerAfter, bool stickyBottom = false)
     {
         _selfReference = DotNetObjectReference.Create(this);
-        await _jsRuntime.InvokeVoidAsync($"{JsFunctionsPrefix}.init", _selfReference, spacerBefore, spacerAfter);
+        await _jsRuntime.InvokeVoidAsync($"{JsFunctionsPrefix}.init", _selfReference, spacerBefore, spacerAfter, 50, stickyBottom);
+    }
+
+    public async ValueTask SetStickyBottomAsync(bool value)
+    {
+        if (_selfReference != null)
+        {
+            await _jsRuntime.InvokeVoidAsync($"{JsFunctionsPrefix}.setStickyBottom", _selfReference, value);
+        }
     }
 
     [JSInvokable]

@@ -74,3 +74,5 @@ Microsoft.AspNetCore.Components.Forms.DisplayName<TValue>
 Microsoft.AspNetCore.Components.Forms.DisplayName<TValue>.DisplayName() -> void
 Microsoft.AspNetCore.Components.Forms.DisplayName<TValue>.For.get -> System.Linq.Expressions.Expression<System.Func<TValue>!>?
 Microsoft.AspNetCore.Components.Forms.DisplayName<TValue>.For.set -> void
+Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<TItem>.StickyBottom.get -> bool
+Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize<TItem>.StickyBottom.set -> void

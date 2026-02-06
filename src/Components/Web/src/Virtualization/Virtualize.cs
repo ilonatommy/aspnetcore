@@ -63,6 +63,9 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     private float _totalMeasuredHeight;
     private int _measuredItemCount;
 
+    // Track StickyBottom for change detection
+    private bool _lastStickyBottom;
+
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = default!;
 
@@ -142,6 +145,15 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     public int MaxItemCount { get; set; } = 100;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the list should automatically scroll to show
+    /// newly appended items when the user is already at the bottom of the list. This is useful
+    /// for chat-like interfaces where new messages should be visible immediately.
+    /// The default value is <c>false</c>.
+    /// </summary>
+    [Parameter]
+    public bool StickyBottom { get; set; }
+
+    /// <summary>
     /// Instructs the component to re-request data from its <see cref="ItemsProvider"/>.
     /// This is useful if external data may have changed. There is no need to call this
     /// when using <see cref="Items"/>.
@@ -210,7 +222,13 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
         if (firstRender)
         {
             _jsInterop = new VirtualizeJsInterop(this, JSRuntime);
-            await _jsInterop.InitializeAsync(_spacerBefore, _spacerAfter);
+            await _jsInterop.InitializeAsync(_spacerBefore, _spacerAfter, StickyBottom);
+            _lastStickyBottom = StickyBottom;
+        }
+        else if (_jsInterop != null && StickyBottom != _lastStickyBottom)
+        {
+            await _jsInterop.SetStickyBottomAsync(StickyBottom);
+            _lastStickyBottom = StickyBottom;
         }
     }
 

@@ -1313,4 +1313,35 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         int GetVisibleRowCount() => container.FindElements(By.CssSelector("tbody tr")).Count;
     }
+
+    [Fact]
+    public void StickyScroll_ExpandingItemAboveViewportDoesNotShiftVisibleContent()
+    {
+        Browser.MountTestComponent<VirtualizationStickyScroll>();
+
+        var container = Browser.Exists(By.Id("scroll-container"));
+
+        var expandButton = Browser.Exists(By.Id("expand-item-2"));
+        expandButton.Click();
+        Browser.True(() => Browser.FindElements(By.CssSelector("#item-2 .expanded-content")).Count > 0);
+
+        Browser.ExecuteJavaScript("document.getElementById('scroll-container').scrollTop = document.getElementById('scroll-container').scrollHeight;");
+
+        Browser.True(() => Browser.FindElements(By.Id("item-2")).Count == 0);
+        Browser.True(() => Browser.FindElements(By.Id("item-90")).Count > 0);
+
+        var visibleItemBefore = Browser.Exists(By.Id("item-90"));
+        var itemPositionBefore = visibleItemBefore.Location.Y;
+
+        var collapseButton = Browser.Exists(By.Id("collapse-all"));
+        collapseButton.Click();
+
+        Browser.Equal("All items collapsed", () => Browser.Exists(By.Id("status")).Text);
+
+        var visibleItemAfter = Browser.Exists(By.Id("item-90"));
+        var itemPositionAfter = visibleItemAfter.Location.Y;
+
+        var positionDelta = Math.Abs(itemPositionAfter - itemPositionBefore);
+        Assert.True(positionDelta < 10, $"Item position shifted by {positionDelta}px. Expected sticky scroll to maintain position.");
+    }
 }

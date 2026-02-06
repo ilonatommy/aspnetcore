@@ -1,0 +1,188 @@
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<h1>Virtualization Sticky Scroll Test</h1>
+<p>Tests scroll behavior: Sticky View (always on) and Sticky Bottom (opt-in)</p>
+
+<div style="margin-bottom: 10px;">
+    <label>
+        <input type="checkbox" id="sticky-bottom-checkbox" @bind="stickyBottomEnabled" />
+        Sticky Bottom Enabled
+    </label>
+    <button id="enable-sticky-bottom" @onclick="() => stickyBottomEnabled = true" style="margin-left: 10px;">Enable Sticky Bottom</button>
+    <button id="disable-sticky-bottom" @onclick="() => stickyBottomEnabled = false">Disable Sticky Bottom</button>
+</div>
+
+<div id="scroll-container" style="height: 300px; overflow-y: auto; border: 2px solid #333;">
+    <Virtualize @ref="virtualizeRef" Items="@items" Context="item" StickyBottom="@stickyBottomEnabled">
+        <div class="item" 
+             id="item-@item.Index"
+             data-index="@item.Index" 
+             style="border: 1px solid gray; padding: 10px; min-height: @(item.Height)px; background-color: hsl(@(item.Index * 20 % 360), 70%, 85%);">
+            <div><strong>Item @item.Index</strong> (height: @item.Height px)</div>
+            @if (item.IsExpanded)
+            {
+                <div class="expanded-content" style="height: 150px; background-color: lightblue; margin-top: 10px; padding: 10px;">
+                    Expanded content for item @item.Index
+                </div>
+            }
+        </div>
+    </Virtualize>
+</div>
+
+<div style="margin-top: 10px;">
+    <p><strong>Scroll Controls:</strong></p>
+    <button id="scroll-to-bottom" @onclick="ScrollToBottom">Scroll to Bottom</button>
+    <button id="scroll-to-top" @onclick="ScrollToTop">Scroll to Top</button>
+    <button id="scroll-to-middle" @onclick="ScrollToMiddle">Scroll to Middle</button>
+</div>
+
+<div style="margin-top: 10px;">
+    <p><strong>Item Controls:</strong></p>
+    <button id="expand-item-2" @onclick="() => ExpandItem(2)">Expand Item 2</button>
+    <button id="expand-item-20" @onclick="() => ExpandItem(20)">Expand Item 20</button>
+    <button id="collapse-all" @onclick="CollapseAll">Collapse All</button>
+</div>
+
+<div style="margin-top: 10px;">
+    <p><strong>List Controls:</strong></p>
+    <button id="add-items" @onclick="AddMoreItems">Add 10 More Items</button>
+    <button id="prepend-items" @onclick="PrependItems">Prepend 5 Items</button>
+    <button id="set-25-items" @onclick="() => SetItemCount(25)">Set 25 Items (all in DOM)</button>
+    <button id="set-50-items" @onclick="() => SetItemCount(50)">Set 50 Items (virtualized)</button>
+</div>
+
+<p>
+    <span>Total items: @items.Count</span> | 
+    <span id="sticky-bottom-status">Sticky Bottom: @(stickyBottomEnabled ? "ON" : "OFF")</span>
+</p>
+
+<p id="status">@statusMessage</p>
+
+@code {
+    private List<DynamicItem> items = new();
+    private Virtualize<DynamicItem> virtualizeRef = default!;
+    private string statusMessage = "Ready";
+    private bool stickyBottomEnabled = false;
+
+    /// <summary>
+    /// Number of items to create. Use small values (e.g., 25) to keep all items in DOM,
+    /// or large values (e.g., 50) to trigger virtualization.
+    /// </summary>
+    [Parameter]
+    public int ItemCount { get; set; } = 50;
+
+    protected override void OnInitialized()
+    {
+        // Create items with variable heights
+        // With default OverscanCount=15, 25 items keeps all in DOM, 100 items triggers virtualization
+        items = Enumerable.Range(0, ItemCount)
+            .Select(i => new DynamicItem 
+            { 
+                Index = i, 
+                BaseHeight = 40 + (i % 5) * 20, // Heights: 40, 60, 80, 100, 120, 40, 60, ... 
+                Height = 40 + (i % 5) * 20,
+                IsExpanded = false 
+            })
+            .ToList();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await JS.InvokeVoidAsync("eval", "document.getElementById('scroll-container').scrollTop = document.getElementById('scroll-container').scrollHeight");
+        statusMessage = "Scrolled to bottom";
+    }
+
+    private async Task ScrollToTop()
+    {
+        await JS.InvokeVoidAsync("eval", "document.getElementById('scroll-container').scrollTop = 0");
+        statusMessage = "Scrolled to top";
+    }
+
+    private async Task ScrollToMiddle()
+    {
+        await JS.InvokeVoidAsync("eval", "document.getElementById('scroll-container').scrollTop = document.getElementById('scroll-container').scrollHeight / 2");
+        statusMessage = "Scrolled to middle";
+    }
+
+    private void PrependItems()
+    {
+        // Find the minimum index currently in the list
+        var minIndex = items.Count > 0 ? items.Min(x => x.Index) : 0;
+        
+        // Create new items with negative indices (below the current minimum)
+        // If minIndex is 0, new items will be -5, -4, -3, -2, -1
+        var newItems = Enumerable.Range(0, 5)
+            .Select(i => new DynamicItem 
+            { 
+                Index = minIndex - 5 + i,  // e.g., -5, -4, -3, -2, -1
+                BaseHeight = 80,
+                Height = 80,
+                IsExpanded = false 
+            })
+            .ToList();
+        
+        // Prepend new items (existing items keep their original indices!)
+        items.InsertRange(0, newItems);
+        
+        statusMessage = "Prepended 5 items";
+    }
+
+    private void SetItemCount(int count)
+    {
+        items = Enumerable.Range(0, count)
+            .Select(i => new DynamicItem 
+            { 
+                Index = i, 
+                BaseHeight = 40 + (i % 5) * 20,
+                Height = 40 + (i % 5) * 20,
+                IsExpanded = false 
+            })
+            .ToList();
+        statusMessage = $"Set to {count} items";
+    }
+
+    private void ExpandItem(int index)
+    {
+        var item = items.FirstOrDefault(i => i.Index == index);
+        if (item != null)
+        {
+            item.IsExpanded = !item.IsExpanded;
+            item.Height = item.IsExpanded ? item.BaseHeight + 170 : item.BaseHeight;
+            statusMessage = $"Item {index} {(item.IsExpanded ? "expanded" : "collapsed")}";
+        }
+    }
+
+    private void CollapseAll()
+    {
+        foreach (var item in items)
+        {
+            if (item.IsExpanded)
+            {
+                item.IsExpanded = false;
+                item.Height = item.BaseHeight;
+            }
+        }
+        statusMessage = "All items collapsed";
+    }
+
+    private void AddMoreItems()
+    {
+        var startIndex = items.Count;
+        for (int i = 0; i < 10; i++)
+        {
+            var baseHeight = 40 + ((startIndex + i) % 5) * 20;
+            items.Add(new DynamicItem { Index = startIndex + i, BaseHeight = baseHeight, Height = baseHeight, IsExpanded = false });
+        }
+        statusMessage = $"Added 10 items. Total: {items.Count}";
+    }
+
+    private class DynamicItem
+    {
+        public int Index { get; set; }
+        public int BaseHeight { get; set; }
+        public int Height { get; set; }
+        public bool IsExpanded { get; set; }
+    }
+}
