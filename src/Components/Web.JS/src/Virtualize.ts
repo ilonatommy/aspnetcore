@@ -54,23 +54,34 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
   const scrollElement = scrollContainer || document.documentElement;
   const isTable = isValidTableElement(spacerAfter.parentElement);
   const supportsAnchor = CSS.supports('overflow-anchor', 'auto');
-  const useNativeAnchoring = !isTable && supportsAnchor;
+  const canUseNativeAnchoring = !isTable && supportsAnchor;
 
   const rangeBetweenSpacers = document.createRange();
+  let convergingElements = false;
+  let convergenceItems: Set<Element> = new Set();
 
   if (isTable) {
     spacerBefore.style.display = 'table-row';
     spacerAfter.style.display = 'table-row';
   }
 
-  if (useNativeAnchoring) {
-    // Prevent spacers from being used as scroll anchors — only rendered items should anchor.
-    spacerBefore.style.overflowAnchor = 'none';
-    spacerAfter.style.overflowAnchor = 'none';
-  } else {
-    // Manual compensation path for tables and browsers without native anchoring.
-    scrollElement.style.overflowAnchor = 'none';
+  function isNativeAnchoringActive(): boolean {
+    return canUseNativeAnchoring && anchorMode !== 0 && !convergingElements;
   }
+
+  function refreshAnchoringStyles(): void {
+    if (canUseNativeAnchoring) {
+      // Prevent spacers from being used as scroll anchors — only rendered items should anchor.
+      spacerBefore.style.overflowAnchor = 'none';
+      spacerAfter.style.overflowAnchor = 'none';
+      scrollElement.style.overflowAnchor = anchorMode === 0 || convergingElements ? 'none' : '';
+    } else {
+      // Manual compensation path for tables and browsers without native anchoring.
+      scrollElement.style.overflowAnchor = 'none';
+    }
+  }
+
+  refreshAnchoringStyles();
 
   const intersectionObserver = new IntersectionObserver(intersectionCallback, {
     root: scrollContainer,
@@ -80,11 +91,14 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
   intersectionObserver.observe(spacerBefore);
   intersectionObserver.observe(spacerAfter);
 
-  let convergingElements = false;
-  let convergenceItems: Set<Element> = new Set();
-
   const anchoredItems: Map<Element, number> = new Map();
   let scrollTriggeredRender = false;
+  let viewportAnchor: { itemOffset: number, itemIndex: number | null, relTop: number } | null = null;
+  let lastSpacerBeforeHeight = spacerBefore.offsetHeight;
+  let lastKnownScrollTop = scrollContainer ? scrollElement.scrollTop : (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
+  let lastKnownScrollHeight = scrollContainer ? scrollElement.scrollHeight : Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  let lastKnownAtTop = lastKnownScrollTop < 1;
+  let lastKnownAtBottom = lastKnownScrollTop + (scrollContainer ? scrollElement.clientHeight : window.innerHeight) >= lastKnownScrollHeight - 1;
 
   // None-mode prepend compensation: suppress spacerBefore IO callbacks until the
   // user scrolls. Without this, the stale IO callback (computed before the scroll
@@ -100,8 +114,166 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
   }
 
+  function armScrollCompensationUnlock(): void {
+    suppressSpacerBeforeCallbacks = true;
+    cleanupScrollUnlock();
+
+    // Use rAF to skip the compensation-triggered scroll event (fires in
+    // the same frame), then listen for the next user-initiated scroll.
+    requestAnimationFrame(() => {
+      scrollUnlockHandler = () => {
+        suppressSpacerBeforeCallbacks = false;
+        scrollUnlockHandler = null;
+      };
+      scrollEventTarget.addEventListener('scroll', scrollUnlockHandler, { once: true });
+    });
+  }
+
+  function applyScrollCompensation(currentSpacerBeforeHeight: number): void {
+    const spacerDelta = currentSpacerBeforeHeight - lastSpacerBeforeHeight;
+    if (Math.abs(spacerDelta) > 0.5) {
+      setScrollTop(getScrollTop() + spacerDelta);
+    }
+
+    lastSpacerBeforeHeight = currentSpacerBeforeHeight;
+    spacerBefore.removeAttribute('data-scroll-compensate');
+    armScrollCompensationUnlock();
+  }
+
   function getObservedHeight(entry: ResizeObserverEntry): number {
     return entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+  }
+
+  function getViewportBounds(): { top: number, bottom: number } {
+    if (scrollContainer) {
+      const bounds = scrollContainer.getBoundingClientRect();
+      return { top: bounds.top, bottom: bounds.bottom };
+    }
+
+    return { top: 0, bottom: window.innerHeight };
+  }
+
+  function getScrollTop(): number {
+    return scrollContainer ? scrollElement.scrollTop : (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0);
+  }
+
+  function setScrollTop(value: number): void {
+    if (scrollContainer) {
+      scrollElement.scrollTop = value;
+    } else {
+      window.scrollTo(0, value);
+    }
+  }
+
+  function getClientHeight(): number {
+    return scrollContainer ? scrollElement.clientHeight : window.innerHeight;
+  }
+
+  function getScrollHeight(): number {
+    return scrollContainer ? scrollElement.scrollHeight : Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  }
+
+  function getRenderedItemElements(): HTMLElement[] {
+    const items: HTMLElement[] = [];
+
+    for (let el = spacerBefore.nextElementSibling; el && el !== spacerAfter; el = el.nextElementSibling) {
+      if (el instanceof HTMLElement) {
+        items.push(el);
+      }
+    }
+
+    return items;
+  }
+
+  function getRenderedItemRange(items: HTMLElement[]): { startIndex: number, items: HTMLElement[] } | null {
+    const startIndex = Number.parseInt(spacerBefore.getAttribute('data-virtualize-rendered-start') || '', 10);
+    const count = Number.parseInt(spacerBefore.getAttribute('data-virtualize-rendered-count') || '', 10);
+    const leadingPlaceholders = Number.parseInt(spacerBefore.getAttribute('data-virtualize-leading-placeholders') || '0', 10);
+
+    if (Number.isInteger(startIndex) && startIndex >= 0 && Number.isInteger(count) && count >= 0
+      && Number.isInteger(leadingPlaceholders) && leadingPlaceholders >= 0) {
+      const loadedItems = items.slice(leadingPlaceholders, leadingPlaceholders + count);
+      if (loadedItems.length === count) {
+        return { startIndex, items: loadedItems };
+      }
+    }
+
+    return null;
+  }
+
+  // Keep a single live anchor representing the first visible rendered item.
+  // When C# supplies a 1:1 rendered range, anchor by logical item index; otherwise
+  // fall back to the DOM offset within the current rendered window.
+  function captureViewportAnchor(): void {
+    const scrollTop = getScrollTop();
+    lastKnownScrollTop = scrollTop;
+    lastKnownScrollHeight = getScrollHeight();
+    lastKnownAtTop = scrollTop < 1;
+    lastKnownAtBottom = scrollTop + getClientHeight() >= lastKnownScrollHeight - 1;
+
+    const viewportBounds = getViewportBounds();
+    const allElements = getRenderedItemElements();
+    const renderedRange = getRenderedItemRange(allElements);
+    const items = renderedRange?.items ?? allElements;
+
+    for (let itemOffset = 0; itemOffset < items.length; itemOffset++) {
+      const rect = items[itemOffset].getBoundingClientRect();
+      if (rect.bottom > viewportBounds.top && rect.top < viewportBounds.bottom) {
+        viewportAnchor = {
+          itemOffset,
+          itemIndex: renderedRange ? renderedRange.startIndex + itemOffset : null,
+          relTop: rect.top - viewportBounds.top,
+        };
+        return;
+      }
+    }
+
+    viewportAnchor = null;
+  }
+
+  function restoreViewportAnchor(): void {
+    if (!viewportAnchor || convergingToBottom || convergingToTop) {
+      captureViewportAnchor();
+      return;
+    }
+
+    const atTop = getScrollTop() < 1;
+    const atBottom = getScrollTop() + getClientHeight() >= getScrollHeight() - 1;
+
+    // Beginning/End edge behavior is handled by the convergence logic. We only
+    // apply anchor restoration while the user is in the middle of the list.
+    if (atTop || atBottom) {
+      captureViewportAnchor();
+      return;
+    }
+
+    const allElements = getRenderedItemElements();
+    const renderedRange = getRenderedItemRange(allElements);
+    const items = renderedRange?.items ?? allElements;
+    const preferredOffset = renderedRange && viewportAnchor.itemIndex !== null
+      ? viewportAnchor.itemIndex - renderedRange.startIndex
+      : viewportAnchor.itemOffset;
+
+    if (renderedRange && viewportAnchor.itemIndex !== null
+      && (preferredOffset < 0 || preferredOffset >= items.length)) {
+      return;
+    }
+
+    const target = items[preferredOffset] ?? items[viewportAnchor.itemOffset];
+    if (!target) {
+      viewportAnchor = null;
+      return;
+    }
+
+    const viewportBounds = getViewportBounds();
+    const currentRelTop = target.getBoundingClientRect().top - viewportBounds.top;
+    const delta = currentRelTop - viewportAnchor.relTop;
+
+    if (Math.abs(delta) > 0.5) {
+      setScrollTop(getScrollTop() + delta);
+    }
+
+    captureViewportAnchor();
   }
 
   function compensateScrollForItemResizes(entries: ResizeObserverEntry[]): void {
@@ -129,8 +301,8 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       }
     }
 
-    if (scrollDelta !== 0 && scrollElement.scrollTop > 0) {
-      scrollElement.scrollTop += scrollDelta;
+    if (scrollDelta !== 0 && getScrollTop() > 0) {
+      setScrollTop(getScrollTop() + scrollDelta);
     }
   }
 
@@ -146,20 +318,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     // the same content. Suppress spacerBefore IO callbacks until the user scrolls
     // to prevent stale IO entries from resetting _itemsBefore back to 0.
     if (spacerBefore.hasAttribute('data-scroll-compensate')) {
-      scrollElement.scrollTop += spacerBefore.offsetHeight;
-      spacerBefore.removeAttribute('data-scroll-compensate');
-      suppressSpacerBeforeCallbacks = true;
-      cleanupScrollUnlock();
-
-      // Use rAF to skip the compensation-triggered scroll event (fires in
-      // the same frame), then listen for the next user-initiated scroll.
-      requestAnimationFrame(() => {
-        scrollUnlockHandler = () => {
-          suppressSpacerBeforeCallbacks = false;
-          scrollUnlockHandler = null;
-        };
-        scrollEventTarget.addEventListener('scroll', scrollUnlockHandler, { once: true });
-      });
+      applyScrollCompensation(spacerBefore.offsetHeight);
     }
 
     for (const entry of entries) {
@@ -174,7 +333,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
 
     // Convergence logic: keep scroll pinned to top/bottom while items load.
     if (convergingToBottom || convergingToTop) {
-      scrollElement.scrollTop = convergingToBottom ? scrollElement.scrollHeight : 0;
+      setScrollTop(convergingToBottom ? getScrollHeight() : 0);
       const spacer = convergingToBottom ? spacerAfter : spacerBefore;
       if (spacer.offsetHeight === 0) {
         convergingToBottom = convergingToTop = false;
@@ -185,7 +344,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
 
     // Manual scroll compensation: adjust scrollTop for above-viewport resizes.
-    if (!useNativeAnchoring) {
+    if (!isNativeAnchoringActive()) {
       compensateScrollForItemResizes(entries);
     }
   });
@@ -193,6 +352,15 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
   // Always observe both spacers for the IntersectionObserver re-trigger.
   resizeObserver.observe(spacerBefore);
   resizeObserver.observe(spacerAfter);
+  captureViewportAnchor();
+
+  function handleScrollForAnchor(): void {
+    if (!convergingToBottom && !convergingToTop) {
+      captureViewportAnchor();
+    }
+  }
+
+  scrollEventTarget.addEventListener('scroll', handleScrollForAnchor, { passive: true });
 
   function refreshObservedElements(): void {
     // C# style updates overwrite the entire style attribute. Re-apply what we need.
@@ -201,14 +369,43 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       spacerAfter.style.display = 'table-row';
     }
 
-    if (useNativeAnchoring) {
-      spacerBefore.style.overflowAnchor = 'none';
-      spacerAfter.style.overflowAnchor = 'none';
-    }
+    refreshAnchoringStyles();
 
     // Ensure spacers are always observed (idempotent).
     resizeObserver.observe(spacerBefore);
     resizeObserver.observe(spacerAfter);
+
+    const currentSpacerBeforeHeight = spacerBefore.offsetHeight;
+    const anchorShift = Number.parseInt(spacerBefore.getAttribute('data-virtualize-anchor-shift') || '', 10);
+    if (Number.isInteger(anchorShift) && viewportAnchor && viewportAnchor.itemIndex !== null) {
+      viewportAnchor.itemIndex += anchorShift;
+    }
+    const spacerDelta = currentSpacerBeforeHeight - lastSpacerBeforeHeight;
+    const hasScrollCompensate = spacerBefore.hasAttribute('data-scroll-compensate');
+    if (hasScrollCompensate) {
+      applyScrollCompensation(currentSpacerBeforeHeight);
+    } else {
+      lastSpacerBeforeHeight = currentSpacerBeforeHeight;
+    }
+    spacerBefore.removeAttribute('data-virtualize-anchor-shift');
+
+    // If the viewport was genuinely sitting at the bottom before this render and
+    // the scrollable height grew, re-enter End-mode convergence. This preserves
+    // "stick to bottom" for large appends without guessing from item counts.
+    const scrollHeightGrew = getScrollHeight() > lastKnownScrollHeight + 0.5;
+    const shouldStickToBottom = !convergingToBottom
+      && !convergingToTop
+      && !pendingJumpToEnd
+      && (anchorMode & 2) !== 0
+      && lastKnownAtBottom
+      && lastKnownScrollTop > 0
+      && scrollHeightGrew;
+
+    if (shouldStickToBottom) {
+      convergingToBottom = true;
+      startConvergenceObserving();
+      setScrollTop(getScrollHeight());
+    }
 
     // During convergence, keep the observed element set in sync with the DOM.
     if (convergingElements) {
@@ -224,13 +421,14 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
         }
       }
       convergenceItems = currentItems;
+      captureViewportAnchor();
       return;
     }
 
     // Manual compensation: observe items so ResizeObserver can compensate scrollTop.
     // Skip for native anchoring (browser handles it) and scroll-triggered renders
     // (avoids layout interference drift).
-    if (!useNativeAnchoring && !scrollTriggeredRender) {
+    if (!isNativeAnchoringActive() && !scrollTriggeredRender) {
       const currentItems = new Set<Element>();
       for (let el = spacerBefore.nextElementSibling; el && el !== spacerAfter; el = el.nextElementSibling) {
         resizeObserver.observe(el);
@@ -244,7 +442,14 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
         }
       }
     }
+
+    const shouldRestoreViewportAnchor = !scrollTriggeredRender || hasScrollCompensate || Number.isInteger(anchorShift);
     scrollTriggeredRender = false;
+    if (shouldRestoreViewportAnchor) {
+      restoreViewportAnchor();
+    } else {
+      captureViewportAnchor();
+    }
 
     // Don't re-trigger IntersectionObserver here — ResizeObserver handles that
     // when spacers actually resize. Doing it on every render causes feedback loops.
@@ -253,9 +458,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
   function startConvergenceObserving(): void {
     if (convergingElements) return;
     convergingElements = true;
-    if (useNativeAnchoring) {
-      scrollElement.style.overflowAnchor = 'none';
-    }
+    refreshAnchoringStyles();
     for (let el = spacerBefore.nextElementSibling; el && el !== spacerAfter; el = el.nextElementSibling) {
       resizeObserver.observe(el);
       convergenceItems.add(el);
@@ -269,9 +472,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       resizeObserver.unobserve(el);
     }
     convergenceItems.clear();
-    if (useNativeAnchoring) {
-      scrollElement.style.overflowAnchor = '';
-    }
+    refreshAnchoringStyles();
     anchoredItems.clear();
   }
 
@@ -313,12 +514,16 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     scrollElement,
     startConvergenceObserving,
     setConvergingToBottom: () => { convergingToBottom = true; },
-    setAnchorMode: (mode: number) => { anchorMode = mode; },
+    setAnchorMode: (mode: number) => {
+      anchorMode = mode;
+      refreshAnchoringStyles();
+    },
     onDispose: () => {
       stopConvergenceObserving();
       anchoredItems.clear();
       resizeObserver.disconnect();
       keydownTarget.removeEventListener('keydown', handleJumpKeys);
+      scrollEventTarget.removeEventListener('scroll', handleScrollForAnchor);
       cleanupScrollUnlock();
       if (callbackTimeout) {
         clearTimeout(callbackTimeout);
@@ -363,14 +568,14 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     if (pendingJumpToEnd) {
       convergingToBottom = true;
       startConvergenceObserving();
-      scrollElement.scrollTop = scrollElement.scrollHeight;
+      setScrollTop(getScrollHeight());
       pendingJumpToEnd = false;
       return;
     }
 
     if (!(anchorMode & 2)) return;
 
-    const atBottom = scrollElement.scrollTop + scrollElement.clientHeight >= scrollElement.scrollHeight - 1;
+    const atBottom = getScrollTop() + getClientHeight() >= getScrollHeight() - 1;
     if (!atBottom) return;
 
     convergingToBottom = true;
@@ -392,14 +597,14 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     if (pendingJumpToStart) {
       convergingToTop = true;
       startConvergenceObserving();
-      scrollElement.scrollTop = 0;
+      setScrollTop(0);
       pendingJumpToStart = false;
       return;
     }
 
     if (!(anchorMode & 1)) return;
 
-    const atTop = scrollElement.scrollTop < 1;
+    const atTop = getScrollTop() < 1;
     if (!atTop) return;
 
     convergingToTop = true;
@@ -428,9 +633,9 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
         return true;
       }
       if (entry.target === spacerAfter && convergingToBottom && spacerAfter.offsetHeight > 0) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
+        setScrollTop(getScrollHeight());
       } else if (entry.target === spacerBefore && convergingToTop && spacerBefore.offsetHeight > 0) {
-        scrollElement.scrollTop = 0;
+        setScrollTop(0);
       }
       return false;
     });
@@ -480,6 +685,9 @@ function scrollToBottom(dotNetHelper: DotNet.DotNetObject): void {
   if (entry) {
     entry.setConvergingToBottom?.();
     entry.scrollElement.scrollTop = entry.scrollElement.scrollHeight;
+    if (entry.scrollElement === document.documentElement) {
+      window.scrollTo(0, entry.scrollElement.scrollHeight);
+    }
     entry.startConvergenceObserving?.();
   }
 }

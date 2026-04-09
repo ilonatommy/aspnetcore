@@ -73,6 +73,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     internal bool _pendingScrollToBottom;
 
     private bool _pendingScrollToSpacerBefore;
+    private int _pendingViewportAnchorShift;
 
     private VirtualizeAnchorMode _lastRenderedAnchorMode;
 
@@ -261,8 +262,9 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
                 await _jsInterop.SetAnchorModeAsync((int)AnchorMode);
             }
 
-            _pendingScrollToSpacerBefore = false;
             await _jsInterop.RefreshObserversAsync();
+            _pendingScrollToSpacerBefore = false;
+            _pendingViewportAnchorShift = 0;
         }
     }
 
@@ -277,21 +279,39 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             throw oldRefreshException;
         }
 
+        var lastItemIndex = Math.Min(_itemsBefore + _visibleItemCapacity, _itemCount);
+        var renderIndex = _itemsBefore;
+        var placeholdersBeforeCount = Math.Min(_loadedItemsStartIndex, lastItemIndex);
+        var leadingPlaceholderCount = Math.Max(0, placeholdersBeforeCount - _itemsBefore);
+
+        var itemsToShow = _loadedItems != null && _itemTemplate != null
+            ? _loadedItems
+                .Skip(Math.Max(0, _itemsBefore - _loadedItemsStartIndex))
+                .Take(Math.Max(0, lastItemIndex - _loadedItemsStartIndex))
+                .ToArray()
+            : Array.Empty<TItem>();
+
         builder.OpenElement(0, SpacerElement);
         builder.AddAttribute(1, "style", GetSpacerStyle(_itemsBefore));
         builder.AddAttribute(2, "aria-hidden", "true");
+        builder.AddAttribute(3, "data-anchor-mode", ((int)AnchorMode).ToString(CultureInfo.InvariantCulture));
+        // Expose the rendered range to JS so it can preserve viewport position by
+        // logical item index instead of DOM node identity when rows are reused.
+        builder.AddAttribute(4, "data-virtualize-rendered-start", Math.Max(_itemsBefore, _loadedItemsStartIndex).ToString(CultureInfo.InvariantCulture));
+        builder.AddAttribute(5, "data-virtualize-rendered-count", itemsToShow.Length.ToString(CultureInfo.InvariantCulture));
+        builder.AddAttribute(6, "data-virtualize-leading-placeholders", leadingPlaceholderCount.ToString(CultureInfo.InvariantCulture));
+        if (_pendingViewportAnchorShift != 0)
+        {
+            builder.AddAttribute(7, "data-virtualize-anchor-shift", _pendingViewportAnchorShift.ToString(CultureInfo.InvariantCulture));
+        }
         // Signal to JS that scrollTop should be set to spacerBefore.offsetHeight after this render.
         // Embedded in the render diff so the ResizeObserver acts on it before the IO fires.
         if (_pendingScrollToSpacerBefore)
         {
-            builder.AddAttribute(3, "data-scroll-compensate", "1");
+            builder.AddAttribute(8, "data-scroll-compensate", "1");
         }
-        builder.AddElementReferenceCapture(4, elementReference => _spacerBefore = elementReference);
+        builder.AddElementReferenceCapture(9, elementReference => _spacerBefore = elementReference);
         builder.CloseElement();
-
-        var lastItemIndex = Math.Min(_itemsBefore + _visibleItemCapacity, _itemCount);
-        var renderIndex = _itemsBefore;
-        var placeholdersBeforeCount = Math.Min(_loadedItemsStartIndex, lastItemIndex);
 
         builder.OpenRegion(3);
 
@@ -311,12 +331,8 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
         {
             builder.AddContent(4, _emptyContent);
         }
-        else if (_loadedItems != null && _itemTemplate != null)
+        else if (itemsToShow.Length > 0 && _itemTemplate != null)
         {
-            var itemsToShow = _loadedItems
-                .Skip(_itemsBefore - _loadedItemsStartIndex)
-                .Take(lastItemIndex - _loadedItemsStartIndex);
-
             builder.OpenRegion(5);
 
             foreach (var item in itemsToShow)
@@ -390,6 +406,11 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
     void IVirtualizeJsCallbacks.OnBeforeSpacerVisible(float spacerSize, float spacerSeparation, float containerSize)
     {
+        if (_pendingScrollToSpacerBefore)
+        {
+            return;
+        }
+
         ProcessMeasurements(spacerSeparation);
 
         CalculateItemDistribution(spacerSize, spacerSeparation, containerSize, out var itemsBefore, out var visibleItemCapacity, out var unusedItemCapacity);
@@ -547,7 +568,6 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             {
                 var previousItemCount = _itemCount;
                 var countDelta = result.TotalItemCount - previousItemCount;
-
                 // Detect if items were prepended above the current viewport position.
                 if (countDelta > 0 && _previousFirstLoadedItem != null
                     && _itemsProvider == DefaultItemsProvider)
@@ -559,6 +579,8 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
                         {
                             // Mid-list: adjust itemsBefore to keep the same items visible.
                             _itemsBefore = Math.Min(_itemsBefore + countDelta, Math.Max(0, result.TotalItemCount - _visibleItemCapacity));
+                            _pendingScrollToSpacerBefore = true;
+                            _pendingViewportAnchorShift = countDelta;
                         }
                         else if (AnchorMode == VirtualizeAnchorMode.None)
                         {

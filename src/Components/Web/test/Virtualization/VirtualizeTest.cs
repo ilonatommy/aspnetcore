@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Reflection;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components.Test.Helpers;
@@ -398,6 +399,92 @@ public class VirtualizeTest
     }
 
     [Fact]
+    public async Task Virtualize_EmitsRenderedRangeMetadataForAnchorRecovery()
+    {
+        Virtualize<int> renderedVirtualize = null;
+
+        var rootComponent = new VirtualizeTestHostcomponent
+        {
+            InnerContent = BuildVirtualizeWithContent(50f, new List<int> { 1, 2, 3 },
+                captureRenderedVirtualize: virtualize => renderedVirtualize = virtualize)
+        };
+
+        var serviceProvider = new ServiceCollection()
+            .AddTransient((sp) => Mock.Of<IJSRuntime>())
+            .BuildServiceProvider();
+
+        var testRenderer = new TestRenderer(serviceProvider);
+        var componentId = testRenderer.AssignRootComponentId(rootComponent);
+
+        await testRenderer.RenderRootComponentAsync(componentId);
+        Assert.NotNull(renderedVirtualize);
+
+        await testRenderer.Dispatcher.InvokeAsync(() =>
+            ((IVirtualizeJsCallbacks)renderedVirtualize).OnAfterSpacerVisible(0f, 150f, 500f));
+
+        var frames = testRenderer.Batches.SelectMany(b => b.ReferenceFrames).ToList();
+
+        Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Attribute
+            && f.AttributeName == "data-anchor-mode"
+            && string.Equals(f.AttributeValue as string, "1", StringComparison.Ordinal));
+        Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Attribute
+            && f.AttributeName == "data-virtualize-rendered-start"
+            && string.Equals(f.AttributeValue as string, "0", StringComparison.Ordinal));
+        Assert.Contains(frames, f => f.FrameType == RenderTreeFrameType.Attribute
+            && f.AttributeName == "data-virtualize-rendered-count"
+            && string.Equals(f.AttributeValue as string, "3", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Virtualize_PrependingItemsAtMidListPreservesLoadedStartItem()
+    {
+        var items = Enumerable.Range(0, 200).Select(i => new RefItem(i)).ToList();
+        Virtualize<RefItem> renderedVirtualize = null;
+
+        var rootComponent = new VirtualizeTestHostcomponent
+        {
+            InnerContent = builder =>
+            {
+                builder.OpenComponent<Virtualize<RefItem>>(0);
+                builder.AddComponentParameter(1, "ItemSize", 50f);
+                builder.AddComponentParameter(2, "Items", items);
+                builder.AddComponentReferenceCapture(3, component =>
+                    renderedVirtualize = component as Virtualize<RefItem>);
+                builder.CloseComponent();
+            }
+        };
+
+        var serviceProvider = new ServiceCollection()
+            .AddTransient((sp) => Mock.Of<IJSRuntime>())
+            .BuildServiceProvider();
+
+        var testRenderer = new TestRenderer(serviceProvider);
+        var componentId = testRenderer.AssignRootComponentId(rootComponent);
+
+        await testRenderer.RenderRootComponentAsync(componentId);
+        Assert.NotNull(renderedVirtualize);
+
+        await testRenderer.Dispatcher.InvokeAsync(() =>
+            ((IVirtualizeJsCallbacks)renderedVirtualize).OnAfterSpacerVisible(
+                5000f, 1000f, 500f));
+
+        var itemsBeforeField = typeof(Virtualize<RefItem>).GetField("_itemsBefore", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(itemsBeforeField);
+
+        var itemsBeforePrepend = (int)itemsBeforeField.GetValue(renderedVirtualize);
+        Assert.True(itemsBeforePrepend > 0);
+        var firstLoadedItem = items[itemsBeforePrepend];
+
+        items.InsertRange(0, Enumerable.Range(-10, 10).Select(i => new RefItem(i)));
+
+        await testRenderer.RenderRootComponentAsync(componentId);
+
+        var itemsBeforeAfterPrepend = (int)itemsBeforeField.GetValue(renderedVirtualize);
+        Assert.Equal(itemsBeforePrepend + 10, itemsBeforeAfterPrepend);
+        Assert.Same(firstLoadedItem, items[itemsBeforeAfterPrepend]);
+    }
+
+    [Fact]
     public async Task Virtualize_RefreshDataAsync_ResetsRunningAverage()
     {
         Virtualize<int> virtualize = null;
@@ -758,6 +845,11 @@ public class VirtualizeTest
 
     private ValueTask<ItemsProviderResult<TItem>> AlwaysThrowsItemsProvider<TItem>(ItemsProviderRequest request)
         => throw new InvalidOperationException("Thrown from items provider.");
+
+    private sealed class RefItem(int value)
+    {
+        public int Value { get; } = value;
+    }
 
     private RenderFragment BuildVirtualize<TItem>(
         float itemSize,

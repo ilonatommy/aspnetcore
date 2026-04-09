@@ -55,12 +55,15 @@ internal sealed class Startup
 
         app.UseRouting();
 
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            // In development, serve everything, as there's no other way to configure it.
-            // In production, developers are responsible for configuring their own production server
-            ServeUnknownFileTypes = true,
-        });
+        app.UseWhen(
+            context => !context.Request.Path.StartsWithSegments("/_framework") && !context.Request.Path.StartsWithSegments("/_content"),
+            branch => branch.UseStaticFiles(new StaticFileOptions
+            {
+                // In development, serve everything, as there's no other way to configure it.
+                // Requests for framework and library assets intentionally bypass this middleware
+                // so the endpoint-mapped static asset pipeline can apply development-time patching.
+                ServeUnknownFileTypes = true,
+            }));
 
         app.UseEndpoints(endpoints =>
         {

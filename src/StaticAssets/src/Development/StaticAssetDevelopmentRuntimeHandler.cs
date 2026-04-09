@@ -37,30 +37,28 @@ internal sealed partial class StaticAssetDevelopmentRuntimeHandler
     public void AttachRuntimePatching(EndpointBuilder builder)
     {
         var original = builder.RequestDelegate!;
-        var asset = builder.Metadata.OfType<StaticAssetDescriptor>().Single();
-        if (asset.HasContentEncoding())
+        var currentAsset = builder.Metadata.OfType<StaticAssetDescriptor>().Single();
+        var asset = currentAsset;
+        if (currentAsset.HasContentEncoding())
         {
-            var originalETag = GetDescriptorOriginalResourceProperty(asset);
+            var originalETag = GetDescriptorOriginalResourceProperty(currentAsset);
             StaticAssetDescriptor? originalAsset = null;
-            if (originalETag is not null && _descriptorsMap.TryGetValue((asset.Route, originalETag), out originalAsset))
+            if (originalETag is not null && _descriptorsMap.TryGetValue((currentAsset.Route, originalETag), out originalAsset))
             {
                 asset = originalAsset;
             }
             else
             {
-                Debug.Assert(originalETag != null, $"The static asset descriptor {asset.Route} - {asset.AssetPath} does not have an original-resource property.");
-                Debug.Assert(originalAsset != null, $"The static asset descriptor {asset.Route} - {asset.AssetPath} has an original-resource property that does not match any known static asset descriptor.");
+                Debug.Assert(originalETag != null, $"The static asset descriptor {currentAsset.Route} - {currentAsset.AssetPath} does not have an original-resource property.");
+                Debug.Assert(originalAsset != null, $"The static asset descriptor {currentAsset.Route} - {currentAsset.AssetPath} has an original-resource property that does not match any known static asset descriptor.");
             }
         }
 
         builder.RequestDelegate = async context =>
         {
             var originalFeature = context.Features.GetRequiredFeature<IHttpResponseBodyFeature>();
-            var fileInfo = context.RequestServices.GetRequiredService<IWebHostEnvironment>().WebRootFileProvider.GetFileInfo(asset.AssetPath);
-            // Truncating is correct because the manifest truncates the timestamp when it serializes the Last-Modified header
-            // (HTTP date format only supports second precision). We need to apply the same truncation here so that we correctly
-            // detect unchanged files rather than always seeing them as different due to subsecond precision mismatch.
-            if (fileInfo.Length != asset.GetContentLength() || TruncateToSeconds(fileInfo.LastModified) != asset.GetLastModified())
+            var webRootFileProvider = context.RequestServices.GetRequiredService<IWebHostEnvironment>().WebRootFileProvider;
+            if (currentAsset != asset || HasAssetChanged(webRootFileProvider, asset) || HasAssetChanged(webRootFileProvider, currentAsset))
             {
                 // At this point, we know that the file has changed from what was generated at build time.
                 // This is for example, when someone changes something in the WWWRoot folder.
@@ -73,6 +71,29 @@ internal sealed partial class StaticAssetDevelopmentRuntimeHandler
             await original(context);
             context.Features.Set(originalFeature);
         };
+    }
+
+    private static bool HasAssetChanged(IFileProvider webRootFileProvider, StaticAssetDescriptor asset)
+    {
+        var fileInfo = webRootFileProvider.GetFileInfo(asset.AssetPath);
+        if (!fileInfo.Exists)
+        {
+            return true;
+        }
+
+        // Truncating is correct because the manifest truncates the timestamp when it serializes the Last-Modified header
+        // (HTTP date format only supports second precision). We need to apply the same truncation here so that we correctly
+        // detect unchanged files rather than always seeing them as different due to subsecond precision mismatch.
+        if (fileInfo.Length != asset.GetContentLength() || TruncateToSeconds(fileInfo.LastModified) != asset.GetLastModified())
+        {
+            return true;
+        }
+
+        // Development builds can regenerate files quickly enough that both size and the
+        // second-truncated timestamp remain unchanged even though the content changed.
+        // Compare the content hash too so fingerprinted boot metadata doesn't go stale.
+        var expectedETag = GetDescriptorETagResponseHeader(asset);
+        return expectedETag is not null && !string.Equals(expectedETag, GetETag(fileInfo), StringComparison.Ordinal);
     }
 
     private static string? GetDescriptorOriginalResourceProperty(StaticAssetDescriptor descriptor)
