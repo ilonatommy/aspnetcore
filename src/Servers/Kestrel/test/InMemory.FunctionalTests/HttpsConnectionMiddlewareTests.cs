@@ -304,6 +304,53 @@ public class HttpsConnectionMiddlewareTests : LoggedTest
     }
 
     [Fact]
+    public async Task SnapshotPreservesAllPropertiesAfterConnectionClose()
+    {
+        var handshakeFeatureTcs = new TaskCompletionSource<ITlsHandshakeFeature>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void ConfigureListenOptions(ListenOptions listenOptions)
+        {
+            // Outer middleware captures the feature AFTER the HTTPS middleware returns,
+            // which is when Snapshot() has been called and the SslStream may be disposed.
+            listenOptions.Use(next => async connectionContext =>
+            {
+                await next(connectionContext);
+
+                var handshakeFeature = connectionContext.Features.Get<ITlsHandshakeFeature>();
+                handshakeFeatureTcs.TrySetResult(handshakeFeature);
+            });
+
+            listenOptions.UseHttps(new HttpsConnectionAdapterOptions { ServerCertificate = _x509Certificate2 });
+        }
+
+        await using (var server = new TestServer(context =>
+        {
+            return context.Response.WriteAsync("hello world");
+        }, new TestServiceContext(LoggerFactory), ConfigureListenOptions))
+        {
+            var result = await server.HttpClientSlim.GetStringAsync($"https://localhost:{server.Port}/", validateCertificate: false);
+            Assert.Equal("hello world", result);
+        }
+
+        var handshakeFeature = await handshakeFeatureTcs.Task.DefaultTimeout();
+        Assert.NotNull(handshakeFeature);
+
+        // Verify all snapshotted properties are accessible after connection close.
+        Assert.Null(handshakeFeature.Exception);
+        Assert.True(handshakeFeature.Protocol > SslProtocols.None);
+        Assert.True(handshakeFeature.NegotiatedCipherSuite >= TlsCipherSuite.TLS_NULL_WITH_NULL_NULL);
+
+#pragma warning disable SYSLIB0058 // Type or member is obsolete
+        Assert.True(handshakeFeature.CipherAlgorithm > CipherAlgorithmType.Null);
+        Assert.True(handshakeFeature.CipherStrength > 0);
+        Assert.True(handshakeFeature.HashAlgorithm >= HashAlgorithmType.None);
+        Assert.True(handshakeFeature.HashStrength >= 0);
+        Assert.True(handshakeFeature.KeyExchangeAlgorithm >= ExchangeAlgorithmType.None);
+        Assert.True(handshakeFeature.KeyExchangeStrength >= 0);
+#pragma warning restore SYSLIB0058
+    }
+
+    [Fact]
     public async Task RequireCertificateFailsWhenNoCertificate()
     {
         await using (var server = new TestServer(App, new TestServiceContext(LoggerFactory), listenOptions =>
@@ -1313,8 +1360,7 @@ public class HttpsConnectionMiddlewareTests : LoggedTest
             using (var connection = server.CreateConnection())
             {
                 var stream = OpenSslStreamWithCert(connection.Stream);
-                await stream.AuthenticateAsClientAsync("localhost");
-                await AssertConnectionResult(stream, false);
+                await AssertConnectionRejected(stream);
             }
         }
     }
@@ -1338,8 +1384,7 @@ public class HttpsConnectionMiddlewareTests : LoggedTest
             using (var connection = server.CreateConnection())
             {
                 var stream = OpenSslStreamWithCert(connection.Stream);
-                await stream.AuthenticateAsClientAsync("localhost");
-                await AssertConnectionResult(stream, false);
+                await AssertConnectionRejected(stream);
             }
         }
     }
@@ -1616,6 +1661,24 @@ public class HttpsConnectionMiddlewareTests : LoggedTest
     {
         return new SslStream(rawStream, false, (sender, certificate, chain, errors) => true,
             (sender, host, certificates, certificate, issuers) => clientCertificate ?? _x509Certificate2);
+    }
+
+    private static async Task AssertConnectionRejected(SslStream stream)
+    {
+        // The server is expected to reject the connection because of the client certificate.
+        // Depending on the platform and runtime, this surfaces in one of two ways: either the TLS
+        // handshake fails directly (the peer sends a fatal certificate alert, e.g. macOS since
+        // https://github.com/dotnet/runtime/pull/128316), or the handshake completes and the server
+        // closes the connection immediately afterward. Both outcomes are valid rejections.
+        try
+        {
+            await stream.AuthenticateAsClientAsync("localhost");
+        }
+        catch (AuthenticationException)
+        {
+            return;
+        }
+        await AssertConnectionResult(stream, false);
     }
 
     private static async Task AssertConnectionResult(SslStream stream, bool success, string body = null)
