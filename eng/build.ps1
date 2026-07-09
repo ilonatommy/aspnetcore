@@ -466,21 +466,32 @@ try {
     $restore = $tmpRestore
 
     # TEMPORARY: Overlay custom MSBuild bootstrap for investigating dotnet/msbuild#12927
+    # Overlays the FULL internally-consistent set (not just Tasks.Core) so the instrumented
+    # assemblies don't reference types the SDK's other MSBuild assemblies lack (which caused
+    # Tools.proj MSB4018 TypeLoadException 'FrameworkFileUtilities' with the single-DLL overlay).
     $bootstrapDir = Join-Path (Join-Path $RepoRoot "eng") "msbuild-bootstrap"
-    $bootstrapDll = Join-Path $bootstrapDir "Microsoft.Build.Tasks.Core.dll"
-    if (Test-Path $bootstrapDll) {
+    $overlayAssemblies = @(
+        "Microsoft.Build.dll",
+        "Microsoft.Build.Framework.dll",
+        "Microsoft.Build.Tasks.Core.dll",
+        "Microsoft.Build.Utilities.Core.dll"
+    )
+    if (Test-Path (Join-Path $bootstrapDir "Microsoft.Build.Tasks.Core.dll")) {
         $dotnetDir = if ($env:DOTNET_INSTALL_DIR) { $env:DOTNET_INSTALL_DIR } else { Join-Path $RepoRoot ".dotnet" }
         $sdkVersion = (Get-Content (Join-Path $RepoRoot "global.json") | ConvertFrom-Json).sdk.version
-        $targetDll = Join-Path (Join-Path (Join-Path $dotnetDir "sdk") $sdkVersion) "Microsoft.Build.Tasks.Core.dll"
-        if (Test-Path $targetDll) {
-            Write-Host "=== MSBuild Bootstrap Overlay (dotnet/msbuild#12927) ==="
-            Write-Host "Original: $((Get-FileHash $targetDll -Algorithm SHA256).Hash) $targetDll"
-            Copy-Item $bootstrapDll $targetDll -Force
-            Write-Host "Replaced: $((Get-FileHash $targetDll -Algorithm SHA256).Hash) $targetDll"
-            Write-Host "=== Overlay complete ==="
-        } else {
-            Write-Host "WARNING: SDK target not found at $targetDll - skipping MSBuild overlay"
+        $sdkDir = Join-Path (Join-Path $dotnetDir "sdk") $sdkVersion
+        Write-Host "=== MSBuild Bootstrap Overlay (dotnet/msbuild#12927) ==="
+        foreach ($asm in $overlayAssemblies) {
+            $src = Join-Path $bootstrapDir $asm
+            $targetDll = Join-Path $sdkDir $asm
+            if ((Test-Path $src) -and (Test-Path $targetDll)) {
+                Copy-Item $src $targetDll -Force
+                Write-Host "Overlaid: $asm -> $((Get-FileHash $targetDll -Algorithm SHA256).Hash)"
+            } else {
+                Write-Host "WARNING: skipped $asm (src or target missing)"
+            }
         }
+        Write-Host "=== Overlay complete ==="
     }
 
     if ($ci) {

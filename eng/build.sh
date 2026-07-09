@@ -413,19 +413,25 @@ InitializeToolset
 restore=$_tmp_restore=
 
 # TEMPORARY: Overlay custom MSBuild bootstrap for investigating dotnet/msbuild#12927
+# Overlays the FULL internally-consistent set (not just Tasks.Core) so the instrumented
+# assemblies don't reference types the SDK's other MSBuild assemblies lack (which caused
+# Tools.proj MSB4018 TypeLoadException 'FrameworkFileUtilities' with the single-DLL overlay).
 _bootstrap_dir="$repo_root/eng/msbuild-bootstrap"
 if [[ -f "$_bootstrap_dir/Microsoft.Build.Tasks.Core.dll" ]]; then
   _sdk_version=$(cat "$repo_root/global.json" | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
-  _target_dll="$DOTNET_INSTALL_DIR/sdk/$_sdk_version/Microsoft.Build.Tasks.Core.dll"
-  if [[ -f "$_target_dll" ]]; then
-    echo "=== MSBuild Bootstrap Overlay (dotnet/msbuild#12927) ==="
-    echo "Original: $(sha256sum "$_target_dll")"
-    cp "$_bootstrap_dir/Microsoft.Build.Tasks.Core.dll" "$_target_dll"
-    echo "Replaced: $(sha256sum "$_target_dll")"
-    echo "=== Overlay complete ==="
-  else
-    echo "WARNING: SDK target not found at $_target_dll - skipping MSBuild overlay"
-  fi
+  _sdk_dir="$DOTNET_INSTALL_DIR/sdk/$_sdk_version"
+  echo "=== MSBuild Bootstrap Overlay (dotnet/msbuild#12927) ==="
+  for _asm in Microsoft.Build.dll Microsoft.Build.Framework.dll Microsoft.Build.Tasks.Core.dll Microsoft.Build.Utilities.Core.dll; do
+    _src="$_bootstrap_dir/$_asm"
+    _target_dll="$_sdk_dir/$_asm"
+    if [[ -f "$_src" && -f "$_target_dll" ]]; then
+      cp "$_src" "$_target_dll"
+      echo "Overlaid: $_asm -> $(sha256sum "$_target_dll" | cut -d' ' -f1)"
+    else
+      echo "WARNING: skipped $_asm (src or target missing)"
+    fi
+  done
+  echo "=== Overlay complete ==="
 fi
 
 MSBuild $_InitializeToolset -p:RepoRoot="$repo_root" ${msbuild_args[@]+"${msbuild_args[@]}"}
