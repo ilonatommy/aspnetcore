@@ -1919,6 +1919,294 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         }
     }
 
+    private void MountQuickGridAnchorModeComponent(string anchorMode, bool useItemsProvider)
+    {
+        Browser.MountTestComponent<BasicTestApp.QuickGridTest.QuickGridAnchorModeComponent>();
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        Browser.True(() => GetElementCount(container, ".item[data-index]") > 0);
+
+        if (useItemsProvider)
+        {
+            Browser.Exists(By.Id("qg-toggle-provider")).Click();
+            Browser.True(() => GetElementCount(container, ".item[data-index]") > 0);
+        }
+
+        var select = new SelectElement(Browser.Exists(By.Id("qg-anchor-mode-select")));
+        select.SelectByValue(anchorMode);
+        Browser.True(() => Browser.Exists(By.Id("qg-current-mode")).Text == anchorMode);
+        Browser.True(() => GetElementCount(container, ".item[data-index]") > 0);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_NearTop_PrependKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollNearTopAndWaitForRender(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-prepend-items")).Click();
+        Browser.Contains("Prepended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} near top: viewport should stay stable after prepend",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_NearTop_AppendKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollNearTopAndWaitForRender(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-append-items")).Click();
+        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} near top: viewport should stay stable after append",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_Top_AppendKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 2);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-append-items")).Click();
+        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} at top: viewport should stay stable after append",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_Bottom_PrependKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollToBottomAndWait(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-prepend-items")).Click();
+        Browser.Contains("Prepended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} at bottom: viewport should stay stable after prepend",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    public void QuickGrid_AnchorMode_MidList_AppendKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollMidListAndWaitForRender(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-append-items")).Click();
+        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} mid-list: viewport should stay stable after append",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    public void QuickGrid_AnchorMode_Bottom_AppendKeepsViewportStable(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollToBottomAndWait(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("qg-append-items")).Click();
+        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        AssertViewportStaysStable(
+            js,
+            By.Id("qg-anchor-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"QuickGrid AnchorMode {anchorMode} at bottom: viewport should stay stable after append",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_HomeKeyJumpsToTop(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollMidListAndWaitForRender(container, js);
+
+        container.SendKeys(Keys.Home);
+
+        Browser.True(() =>
+        {
+            var scrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+            return scrollTop < 2;
+        }, TimeSpan.FromSeconds(10), $"QuickGrid AnchorMode {anchorMode}: Home key should jump to the top of the list");
+
+        Browser.True(() => container.FindElements(By.CssSelector("[data-index='0']")).Count > 0,
+            $"QuickGrid AnchorMode {anchorMode}: item 0 should be visible after Home key");
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("0", true)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public void QuickGrid_AnchorMode_EndKeyJumpsToBottom(string anchorMode, bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 50);
+
+        container.SendKeys(Keys.End);
+
+        Browser.True(() =>
+        {
+            var scrollTop = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+            var scrollHeight = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+            var clientHeight = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+            return scrollHeight - scrollTop - clientHeight < 2;
+        }, TimeSpan.FromSeconds(10), $"QuickGrid AnchorMode {anchorMode}: End key should jump to the bottom of the list");
+    }
+
+    // None mode: a large append at the bottom must not converge the viewport to the very bottom
+    // of the grown list (contrast with End mode's follow behavior).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QuickGrid_AnchorMode_None_LargeAppendAtBottom_DoesNotFollowToBottom(bool useItemsProvider)
+    {
+        MountQuickGridAnchorModeComponent("0", useItemsProvider);
+
+        var container = Browser.Exists(By.Id("qg-anchor-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollToBottomAndWait(container, js);
+
+        Browser.Exists(By.Id("qg-append-many-items")).Click();
+        Browser.Contains("Appended 100 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        var st = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+        var sh = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+        var ch = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+        var gap = sh - st - ch;
+        Assert.True(gap > 2000,
+            $"QuickGrid None mode: viewport should not converge to bottom after large append. " +
+            $"scrollTop: {st}, scrollHeight: {sh}, gap: {gap}");
+    }
+
     [Fact]
     public void NestedVariableHeight_OuterMeasurementsNotPollutedByInner()
     {
