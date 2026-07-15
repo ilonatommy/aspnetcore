@@ -2015,7 +2015,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         var container = Browser.Exists(By.Id("qg-anchor-container"));
         var js = (IJavaScriptExecutor)Browser;
 
-        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 2);
+        AssertScrollTop(js, container, st => st < 2, "QuickGrid should start at the top");
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
@@ -2167,7 +2167,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         var container = Browser.Exists(By.Id("qg-anchor-container"));
         var js = (IJavaScriptExecutor)Browser;
 
-        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 50);
+        AssertScrollTop(js, container, st => st < 50, "QuickGrid should start near the top");
 
         container.SendKeys(Keys.End);
 
@@ -2664,7 +2664,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         var container = Browser.Exists(By.Id("scroll-container"));
         var js = (IJavaScriptExecutor)Browser;
 
-        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 2);
+        AssertScrollTop(js, container, st => st < 2, "list should start at the top");
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
@@ -2755,7 +2755,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         var container = Browser.Exists(By.Id("scroll-container"));
         var js = (IJavaScriptExecutor)Browser;
 
-        Assert.True((long)js.ExecuteScript("return arguments[0].scrollTop", container) < 50);
+        AssertScrollTop(js, container, st => st < 50, "list should start near the top");
 
         // End key should always work regardless of anchor mode.
         container.SendKeys(Keys.End);
@@ -4097,7 +4097,14 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             var itemCount = Convert.ToInt32(result["itemCount"], CultureInfo.InvariantCulture);
             var firstIndex = result["firstIndex"]?.ToString() ?? "";
 
-            if (scrollTop == lastScrollTop && itemCount == lastItemCount && firstIndex == lastFirstIndex)
+            if (string.IsNullOrEmpty(firstIndex))
+            {
+                // A blank viewport (only spacers visible) is a transient state while the
+                // anchor restore is in flight, not a settled render. Keep waiting for an
+                // item to reappear rather than reporting this moment as stable.
+                stableCount = 0;
+            }
+            else if (scrollTop == lastScrollTop && itemCount == lastItemCount && firstIndex == lastFirstIndex)
             {
                 stableCount++;
             }
