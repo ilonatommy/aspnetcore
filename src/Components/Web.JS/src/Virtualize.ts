@@ -689,8 +689,12 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     // Keep the anchor snapshot fresh on every IO callback so it reflects
     // the current scroll position, not just the last render. Skip when
     // suppression is active — those callbacks have pre-restore stale data.
+    // Also skip on unchanged scrollTop: a data-driven shift moves the DOM without a scroll.
     if (!suppressSpacerCallbacks) {
-      updateAnchorSnapshot();
+      const snapshot = observersByDotNetObjectId[id].anchorSnapshot;
+      if (!snapshot || snapshot.scrollTop !== scrollElement.scrollTop) {
+        updateAnchorSnapshot();
+      }
     }
 
     const intersectingEntries = entries.filter(entry => {
