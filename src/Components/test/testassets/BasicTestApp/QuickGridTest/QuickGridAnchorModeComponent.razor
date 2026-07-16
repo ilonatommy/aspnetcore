@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using System.Linq
+@using System.Threading
 
 <h3>QuickGrid Virtualize anchoring test</h3>
 
@@ -26,6 +27,8 @@
     <button id="qg-prepend-items" @onclick="PrependItems">Prepend 10 Items</button>
     <button id="qg-append-items" @onclick="AppendItems">Append 10 Items</button>
     <button id="qg-append-many-items" @onclick="AppendManyItems">Append 100 Items</button>
+    <button id="qg-toggle-provider-gate" @onclick="ToggleProviderGate">Gate: @(useProviderGate ? "On" : "Off")</button>
+    <button id="qg-release-provider-gate" @onclick="ReleaseProviderGate">Release gate</button>
 </p>
 
 <style>
@@ -54,6 +57,8 @@
 
 <p id="qg-status">@statusMessage</p>
 <p id="qg-current-mode">@((int)anchorMode)</p>
+<p id="qg-provider-call-index" data-value="@providerCallIndex">@providerCallIndex</p>
+<p id="qg-provider-events" data-value="@string.Join("|", providerEvents)">@string.Join("|", providerEvents)</p>
 
 @code {
     internal class AnchorItem
@@ -79,6 +84,12 @@
     private List<AnchorItem> _pendingPrepend;
     private List<AnchorItem> _pendingAppend;
 
+    // Deterministic gate: when armed, the provider blocks until the test releases it.
+    private bool useProviderGate;
+    private TaskCompletionSource providerGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int providerCallIndex;
+    private readonly List<string> providerEvents = new();
+
     protected override void OnInitialized()
     {
         items = Enumerable.Range(0, 1000).Select(i => new AnchorItem { Index = i }).ToList();
@@ -95,6 +106,19 @@
     {
         slowProvider = !slowProvider;
         statusMessage = slowProvider ? "Provider delay on (150ms)" : "Provider delay off";
+    }
+
+    private void ToggleProviderGate()
+    {
+        useProviderGate = !useProviderGate;
+        statusMessage = useProviderGate ? "Provider gate: On" : "Provider gate: Off";
+    }
+
+    private void ReleaseProviderGate()
+    {
+        var old = providerGate;
+        providerGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        old.TrySetResult();
     }
 
     private void OnAnchorModeChanged(ChangeEventArgs e)
@@ -165,6 +189,26 @@
         if (slowProvider)
         {
             await Task.Delay(150);
+        }
+
+        if (useProviderGate)
+        {
+            var n = Interlocked.Increment(ref providerCallIndex);
+            var gate = providerGate;
+            lock (providerEvents) providerEvents.Add($"p{n}-enter");
+            await InvokeAsync(StateHasChanged);
+            try
+            {
+                await gate.Task.WaitAsync(request.CancellationToken);
+                lock (providerEvents) providerEvents.Add($"p{n}-return");
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (OperationCanceledException)
+            {
+                lock (providerEvents) providerEvents.Add($"p{n}-cancel");
+                await InvokeAsync(StateHasChanged);
+                throw;
+            }
         }
 
         if (_pendingPrepend != null)

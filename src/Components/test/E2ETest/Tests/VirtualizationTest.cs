@@ -1937,6 +1937,40 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Browser.True(() => GetElementCount(container, ".item[data-index]") > 0);
     }
 
+    private void QuickGridMutate(IJavaScriptExecutor js, string mutationButtonId, string statusText, bool useItemsProvider)
+    {
+        if (useItemsProvider)
+        {
+            GatedQuickGridProviderMutation(js, mutationButtonId);
+        }
+        else
+        {
+            Browser.Exists(By.Id(mutationButtonId)).Click();
+        }
+
+        Browser.Contains(statusText, () => Browser.Exists(By.Id("qg-status")).Text);
+    }
+
+    private void GatedQuickGridProviderMutation(IJavaScriptExecutor js, string mutationButtonId)
+    {
+        var entersBefore = CountProviderEnters(js);
+
+        Browser.Exists(By.Id("qg-toggle-provider-gate")).Click();
+        Browser.Exists(By.Id(mutationButtonId)).Click();
+        Browser.True(() => CountProviderEnters(js) > entersBefore,
+            TimeSpan.FromSeconds(10), "Gated provider call did not park at the gate");
+
+        Browser.Exists(By.Id("qg-toggle-provider-gate")).Click();
+        Browser.Exists(By.Id("qg-release-provider-gate")).Click();
+    }
+
+    private static int CountProviderEnters(IJavaScriptExecutor js)
+    {
+        var events = (string)js.ExecuteScript(
+            "return document.getElementById('qg-provider-events')?.getAttribute('data-value') ?? '';");
+        return events.Split("-enter").Length - 1;
+    }
+
     [Theory]
     [InlineData("0", false)]
     [InlineData("1", false)]
@@ -1987,8 +2021,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
-        Browser.Exists(By.Id("qg-append-items")).Click();
-        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        QuickGridMutate(js, "qg-append-items", "Appended 10 items", useItemsProvider);
         WaitForRenderToSettle(container, js);
 
         AssertViewportStaysStable(
@@ -2019,8 +2052,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
-        Browser.Exists(By.Id("qg-append-items")).Click();
-        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        QuickGridMutate(js, "qg-append-items", "Appended 10 items", useItemsProvider);
         WaitForRenderToSettle(container, js);
 
         AssertViewportStaysStable(
@@ -2081,8 +2113,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
-        Browser.Exists(By.Id("qg-append-items")).Click();
-        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        QuickGridMutate(js, "qg-append-items", "Appended 10 items", useItemsProvider);
         WaitForRenderToSettle(container, js);
 
         AssertViewportStaysStable(
@@ -2111,8 +2142,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
 
-        Browser.Exists(By.Id("qg-append-items")).Click();
-        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("qg-status")).Text);
+        QuickGridMutate(js, "qg-append-items", "Appended 10 items", useItemsProvider);
         WaitForRenderToSettle(container, js);
 
         AssertViewportStaysStable(
