@@ -852,7 +852,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
                 // ReferenceEquals would always return false due to boxing.
                 if (newFirstItem != null && !EqualityComparer<TItem>.Default.Equals(_previousFirstLoadedItem, newFirstItem))
                 {
-                    result = await AdjustForPrependAsync(countDelta, result.TotalItemCount, cancellationToken);
+                    result = await AdjustForPrependAsync(countDelta, result.TotalItemCount, armAnchorShift: false, cancellationToken);
                 }
                 else if (ShouldAnchorForAppend(countDelta, previousItemCount))
                 {
@@ -872,7 +872,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
                     if (itemsShifted)
                     {
-                        result = await AdjustForPrependAsync(countDelta, result.TotalItemCount, cancellationToken);
+                        result = await AdjustForPrependAsync(countDelta, result.TotalItemCount, armAnchorShift: true, cancellationToken);
                     }
                     else if (ShouldAnchorForAppend(countDelta, previousItemCount))
                     {
@@ -950,8 +950,15 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     };
 
     private async ValueTask<ItemsProviderResult<TItem>> AdjustForPrependAsync(
-        int countDelta, int newTotalCount, CancellationToken cancellationToken)
+        int countDelta, int newTotalCount, bool armAnchorShift, CancellationToken cancellationToken)
     {
+        var before = _itemsBefore;
+
+        if (armAnchorShift && _jsInterop is not null)
+        {
+            await _jsInterop.BeginAnchorShiftAsync();
+        }
+
         _itemsBefore = Math.Min(_itemsBefore + countDelta, Math.Max(0, newTotalCount - _visibleItemCapacity));
         _pendingAnchorRestore = true;
 
