@@ -10,7 +10,6 @@ export const Virtualize = {
   refreshObservers,
   setAnchorMode,
   restoreAnchor,
-  beginAnchorShift,
   alignToItem,
   beginProgrammaticScroll,
   isFollowingBottom,
@@ -409,15 +408,6 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
   }
 
-  function beginAnchorShift(): void {
-    if ((anchorMode & 1) && scrollElement.scrollTop < 1) {
-      return;
-    }
-    flushPendingStyleMutations();
-    updateAnchorSnapshot();
-    suppressSpacerCallbacks = true;
-  }
-
   function startConvergenceObserving(): void {
     if (convergingElements) return;
     convergingElements = true;
@@ -568,7 +558,6 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     isFollowingBottom: () => followingBottom,
     setAnchorMode: (mode: number) => { anchorMode = mode; followingBottom = (mode & 2) !== 0; },
     restoreAnchor: restoreAnchorForShift,
-    beginAnchorShift,
     alignToItem: alignToItemAt,
     beginProgrammaticScroll: beginProgrammaticScrollSuppression,
     anchorSnapshot: null as { anchorItemIndex: number; anchorOffset: number; scrollTop: number } | null,
@@ -792,12 +781,6 @@ function restoreAnchor(dotNetHelper: DotNet.DotNetObject): void {
   const { observersByDotNetObjectId, id } = getObserversMapEntry(dotNetHelper);
   const entry = observersByDotNetObjectId[id];
   entry?.restoreAnchor?.();
-}
-
-function beginAnchorShift(dotNetHelper: DotNet.DotNetObject): void {
-  const { observersByDotNetObjectId, id } = getObserversMapEntry(dotNetHelper);
-  const entry = observersByDotNetObjectId[id];
-  entry?.beginAnchorShift?.();
 }
 
 function alignToItem(dotNetHelper: DotNet.DotNetObject, localIndex: number): void {

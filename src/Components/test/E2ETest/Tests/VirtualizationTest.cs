@@ -2438,7 +2438,6 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             indexBefore,
             relTopBefore,
             "QuickGrid None mode mid-list: viewport should stay visually stable after prepend",
-            driftTolerance: 1,
             compareWholePixels: true);
     }
 
@@ -2466,9 +2465,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             ".item",
             indexBefore,
             relTopBefore,
-            "QuickGrid Start mode mid-list: viewport should stay stable after prepend",
-            // Sub-pixel row geometry: allow <1px drift (the index check asserts the anchored row).
-            driftTolerance: 1);
+            "QuickGrid Start mode mid-list: viewport should stay stable after prepend");
     }
 
     [Theory]
@@ -2495,9 +2492,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             ".item",
             indexBefore,
             relTopBefore,
-            "QuickGrid End mode mid-list: viewport should stay stable after prepend",
-            // Sub-pixel row geometry: allow <1px drift (the index check asserts the anchored row).
-            driftTolerance: 1);
+            "QuickGrid End mode mid-list: viewport should stay stable after prepend");
     }
 
     [Theory]
