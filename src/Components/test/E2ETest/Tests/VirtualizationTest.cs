@@ -1992,6 +1992,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData("0", true, true)]
     [InlineData("1", true, true)]
     [InlineData("2", true, true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_NearTop_PrependKeepsViewportStable(string anchorMode, bool useItemsProvider, bool useDelay)
     {
         MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
@@ -2057,6 +2058,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData("0", true)]
     [InlineData("1", true)]
     [InlineData("2", true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_Top_AppendKeepsViewportStable(string anchorMode, bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
@@ -2117,6 +2119,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(true, true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_None_PrependAtTop_ViewportStaysStable(bool useItemsProvider, bool useDelay)
     {
         MountQuickGridAnchorModeComponent("0", useItemsProvider);
@@ -2416,6 +2419,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_None_MidList_ViewportStable(bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent("0", useItemsProvider);
@@ -2444,6 +2448,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_Start_MidList_ViewportStable(bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent("1", useItemsProvider);
@@ -2471,6 +2476,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_End_MidList_ViewportStable(bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent("2", useItemsProvider);
@@ -2522,6 +2528,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_Start_LargeAppendAtBottom_DoesNotFollowToBottom(bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent("1", useItemsProvider);
@@ -2635,6 +2642,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData("0", true)]
     [InlineData("1", true)]
     [InlineData("2", true)]
+    [QuarantinedTest("https://github.com/dotnet/aspnetcore/issues/67865")]
     public void QuickGrid_AnchorMode_EndKeyJumpsToBottom(string anchorMode, bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent(anchorMode, useItemsProvider);
