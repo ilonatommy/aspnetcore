@@ -246,7 +246,7 @@
 
         var lastIndexExcl = Math.Min(request.StartIndex + request.Count, numPeopleInItemsProvider);
         return new ItemsProviderResult<Person>(
-            Enumerable.Range(1 + request.StartIndex, lastIndexExcl - request.StartIndex).Select(GeneratePerson).ToList(),
+            Enumerable.Range(1 + request.StartIndex, lastIndexExcl - request.StartIndex).Select(GetOrCreatePerson).ToList(),
             numPeopleInItemsProvider);
     }
 
@@ -275,8 +275,21 @@
         var effectiveCount = lastIndexExcl - request.StartIndex;
         var resultItems = effectiveCount <= 0
             ? Enumerable.Empty<Person>()
-            : Enumerable.Range(1 + request.StartIndex, effectiveCount).Select(GeneratePerson).ToList();
+            : Enumerable.Range(1 + request.StartIndex, effectiveCount).Select(GetOrCreatePerson).ToList();
         return new ItemsProviderResult<Person>(resultItems, largeDataSetLength);
+    }
+
+    readonly Dictionary<int, Person> _personCache = new();
+
+    Person GetOrCreatePerson(int index)
+    {
+        if (!_personCache.TryGetValue(index, out var person))
+        {
+            person = GeneratePerson(index);
+            _personCache[index] = person;
+        }
+
+        return person;
     }
 
     class Person
