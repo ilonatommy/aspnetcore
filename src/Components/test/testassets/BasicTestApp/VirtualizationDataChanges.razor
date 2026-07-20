@@ -246,7 +246,7 @@
 
         var lastIndexExcl = Math.Min(request.StartIndex + request.Count, numPeopleInItemsProvider);
         return new ItemsProviderResult<Person>(
-            Enumerable.Range(1 + request.StartIndex, lastIndexExcl - request.StartIndex).Select(GetOrCreatePerson).ToList(),
+            Enumerable.Range(1 + request.StartIndex, lastIndexExcl - request.StartIndex).Select(GeneratePerson).ToList(),
             numPeopleInItemsProvider);
     }
 
@@ -294,6 +294,7 @@
 
     class Person
     {
+        public int Id { get; init; }
         public string Name { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
@@ -303,11 +304,18 @@
         {
             Name += " MUTATED";
         }
+
+        public override bool Equals(object obj)
+            => obj is Person other && other.Id == Id;
+
+        public override int GetHashCode()
+            => Id;
     }
 
     static Person GeneratePerson(int index)
         => new Person
         {
+            Id = index,
             Name = $"Person {index}",
             LastName = $"Last Name {index}",
             Email = $"person{index}@example.com",
