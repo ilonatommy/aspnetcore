@@ -1347,7 +1347,11 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Browser.Equal("Total: 1001", () => totalItemCount.Text);
 
         refreshButton.Click();
-        finishLoadingButton.Click();
+        Browser.True(() =>
+        {
+            finishLoadingButton.Click();
+            return container.FindElements(By.Id("async-variable-item-0")).Count > 0;
+        }, TimeSpan.FromSeconds(5), "New item-0 should render at top after prepend");
 
         firstItem = container.FindElement(By.Id("async-variable-item-0"));
         Assert.Contains("height: 100px", firstItem.GetDomAttribute("style"));
