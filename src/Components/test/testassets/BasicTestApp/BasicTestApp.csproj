@@ -6,6 +6,11 @@
     <!-- Must be defined before ReferenceFromSource.props is imported -->
     <AdditionalRunArguments>--pathbase /subdir</AdditionalRunArguments>
 
+    <!-- Enables a SPA fallback endpoint in the static web assets manifest so the Blazor Gateway
+         (used for local, non-trimmed E2E runs) serves index.html for client-side routes under
+         the path base instead of returning 404. -->
+    <StaticWebAssetSpaFallbackEnabled>true</StaticWebAssetSpaFallbackEnabled>
+
     <!-- Resx generation on Resources.resx only -->
     <GenerateResxSource>false</GenerateResxSource>
 
