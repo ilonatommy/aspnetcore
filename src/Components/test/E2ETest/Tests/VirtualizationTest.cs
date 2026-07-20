@@ -2050,11 +2050,17 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             $"Large jumps indicate CSS scroll anchoring is miscalculating on <tr> elements.");
     }
 
-    private void MountAnchorModeComponent(string anchorMode, bool variableHeight = false, bool useItemsProvider = false)
+    private void MountAnchorModeComponent(string anchorMode, bool variableHeight = false, bool useItemsProvider = false, bool useDefaultComparer = false)
     {
         Browser.MountTestComponent<VirtualizationAnchorMode>();
         var container = Browser.Exists(By.Id("scroll-container"));
         Browser.True(() => GetElementCount(container, ".item") > 0);
+
+        if (useDefaultComparer)
+        {
+            Browser.Exists(By.Id("toggle-comparer")).Click();
+            Browser.True(() => GetElementCount(container, ".item") > 0);
+        }
 
         if (useItemsProvider)
         {
@@ -2536,6 +2542,67 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             relTopBefore,
             "None mode mid-list: viewport should stay visually stable after prepend",
             compareWholePixels: true);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("1")]
+    public void AnchorMode_Provider_DefaultComparer_PrependDetected_ViewportStable(string anchorMode)
+    {
+        MountAnchorModeComponent(anchorMode, useItemsProvider: true, useDefaultComparer: true);
+
+        var container = Browser.Exists(By.Id("scroll-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollMidListAndWaitForRender(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("prepend-items")).Click();
+        Browser.Contains("Prepended 10 items", () => Browser.Exists(By.Id("status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        // If the prepend were NOT detected the content above the viewport would grow without
+        // scrollTop compensation, pushing the anchored item down. A stable viewport proves the
+        // default comparer detected the prepend and Virtualize compensated for it.
+        AssertViewportStaysStable(
+            js,
+            By.Id("scroll-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"AnchorMode {anchorMode} provider + default comparer: prepend must be detected and keep the viewport stable",
+            driftTolerance: 2);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("1")]
+    public void AnchorMode_Provider_DefaultComparer_AppendNotDetectedAsPrepend_ViewportStable(string anchorMode)
+    {
+        MountAnchorModeComponent(anchorMode, useItemsProvider: true, useDefaultComparer: true);
+
+        var container = Browser.Exists(By.Id("scroll-container"));
+        var js = (IJavaScriptExecutor)Browser;
+
+        ScrollMidListAndWaitForRender(container, js);
+
+        var (indexBefore, relTopBefore, _) = GetItemPositionInContainer(js, container, ".item");
+
+        Browser.Exists(By.Id("append-items")).Click();
+        Browser.Contains("Appended 10 items", () => Browser.Exists(By.Id("status")).Text);
+        WaitForRenderToSettle(container, js);
+
+        // Appending below the viewport must not be misread as a prepend (which would compensate
+        // scrollTop and shift the anchored item). The viewport should stay put.
+        AssertViewportStaysStable(
+            js,
+            By.Id("scroll-container"),
+            ".item",
+            indexBefore,
+            relTopBefore,
+            $"AnchorMode {anchorMode} provider + default comparer: append below viewport must not be misdetected as a prepend",
+            driftTolerance: 2);
     }
 
     [Theory]
