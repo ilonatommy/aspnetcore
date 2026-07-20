@@ -184,9 +184,9 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     /// (e.g., <c>Id</c>); otherwise reference-equality fallback would produce false-positive
     /// prepend detection when the provider returns fresh instances.
     ///
-    /// Unless you set this parameter, items are compared by reference; set it to compare items
-    /// another way (for example by a unique identifier). The <c>BL0011</c> analyzer warns when
-    /// <see cref="ItemsProvider"/> is used without an explicit <see cref="ItemComparer"/> assignment.
+    /// The <c>BL0011</c> analyzer warns when <see cref="ItemsProvider"/> is used without an
+    /// explicit <see cref="ItemComparer"/> assignment, because the default comparer falls back to
+    /// reference equality for classes without value-equality semantics.
     ///
     /// For in-memory <see cref="Items"/>, this parameter is not needed because the component
     /// can detect prepends using object identity.
