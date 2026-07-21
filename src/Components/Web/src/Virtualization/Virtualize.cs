@@ -485,12 +485,19 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             // same viewport offset. Skip while a ScrollToItemAsync is in flight — we are
             // intentionally moving the viewport.
             var shouldRestore = _pendingAnchorRestore && !_pendingScrollToBottom && _currentScrollCts is null;
-            _pendingAnchorRestore = false;
+
+            var deferAnchorRestoreClear = shouldRestore && AnchorMode == VirtualizeAnchorMode.None;
+            if (!deferAnchorRestoreClear)
+            {
+                _pendingAnchorRestore = false;
+            }
 
             if (shouldRestore)
             {
                 await _jsInterop.RestoreAnchorAsync();
             }
+
+            _pendingAnchorRestore = false;
 
             await _jsInterop.RefreshObserversAsync();
         }
