@@ -88,6 +88,8 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     // so the viewport stays stable after a prepend or append.
     private bool _pendingAnchorRestore;
 
+    private bool _deferPrependAnchorClear;
+
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = default!;
 
@@ -480,7 +482,9 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             // intentionally moving the viewport.
             var shouldRestore = _pendingAnchorRestore && !_pendingScrollToBottom && _currentScrollCts is null;
 
-            var deferAnchorRestoreClear = shouldRestore && AnchorMode == VirtualizeAnchorMode.None;
+            var deferAnchorRestoreClear = shouldRestore
+                && (AnchorMode == VirtualizeAnchorMode.None
+                    || ((AnchorMode & VirtualizeAnchorMode.Start) != 0 && _deferPrependAnchorClear));
             if (!deferAnchorRestoreClear)
             {
                 _pendingAnchorRestore = false;
@@ -492,6 +496,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
             }
 
             _pendingAnchorRestore = false;
+            _deferPrependAnchorClear = false;
 
             await _jsInterop.RefreshObserversAsync();
         }
@@ -953,8 +958,10 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
     private async ValueTask<ItemsProviderResult<TItem>> AdjustForPrependAsync(
         int countDelta, int newTotalCount, CancellationToken cancellationToken)
     {
+        var wasAtTop = _itemsBefore == 0;
         _itemsBefore = Math.Min(_itemsBefore + countDelta, Math.Max(0, newTotalCount - _visibleItemCapacity));
         _pendingAnchorRestore = true;
+        _deferPrependAnchorClear = !wasAtTop;
 
         var adjustedRequest = new ItemsProviderRequest(_itemsBefore, _visibleItemCapacity, cancellationToken);
         return await _itemsProvider(adjustedRequest);

@@ -1997,8 +1997,8 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData("1", false)]
     [InlineData("2", false)]
     [InlineData("0", true)]
-    // Start/End async variants still disabled pending fix https://github.com/dotnet/aspnetcore/issues/67865:
-    // [InlineData("1", true)]
+    [InlineData("1", true)]
+    // End async variant still disabled pending fix https://github.com/dotnet/aspnetcore/issues/67865:
     // [InlineData("2", true)]
     public void QuickGrid_AnchorMode_NearTop_PrependKeepsViewportStable(string anchorMode, bool useItemsProvider)
     {
@@ -2126,8 +2126,8 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
     [InlineData("1", false)]
     [InlineData("2", false)]
     [InlineData("0", true)]
-    // Start/End async variants still disabled pending fix https://github.com/dotnet/aspnetcore/issues/67865:
-    // [InlineData("1", true)]
+    [InlineData("1", true)]
+    // End async variant still disabled pending fix https://github.com/dotnet/aspnetcore/issues/67865:
     // [InlineData("2", true)]
     public void QuickGrid_AnchorMode_Bottom_PrependKeepsViewportStable(string anchorMode, bool useItemsProvider)
     {
@@ -2488,8 +2488,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
     [Theory]
     [InlineData(false)]
-    // Disabled pending fix https://github.com/dotnet/aspnetcore/issues/67865 (provider async-anchor race: index jumps 90->80):
-    // [InlineData(true)]
+    [InlineData(true)]
     public void QuickGrid_AnchorMode_Start_MidList_ViewportStable(bool useItemsProvider)
     {
         MountQuickGridAnchorModeComponent("1", useItemsProvider);
