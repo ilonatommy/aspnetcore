@@ -466,10 +466,9 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToStart = true;
       pendingJumpToEnd = false;
-      if ((anchorMode & 2) === 0) {
-        bottomTracking.following = false;
-        bottomTracking.reached = false;
-      }
+      bottomTracking.following = false;
+      bottomTracking.reached = false;
+      bottomTracking.wasAtBottomLastRender = false;
       if (!convergingToTop && spacerBefore.offsetHeight > 0) {
         convergingToTop = true;
         startConvergenceObserving();
