@@ -4421,8 +4421,14 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         WindowScrollToBottomAndWait(js);
 
+        var scrollHeightBefore = (long)js.ExecuteScript("return document.documentElement.scrollHeight");
+
         Browser.Exists(By.Id("append-many-items")).Click();
         Browser.Contains("Appended 100 items", () => Browser.Exists(By.Id("status")).Text);
+
+        Browser.True(() => (long)js.ExecuteScript("return document.documentElement.scrollHeight") > scrollHeightBefore + 2000,
+            TimeSpan.FromSeconds(10),
+            "Large append should grow the scrollable height before the viewport position is checked");
 
         var scrollY = (long)js.ExecuteScript("return Math.round(window.scrollY)");
         var scrollHeight = (long)js.ExecuteScript("return document.documentElement.scrollHeight");
