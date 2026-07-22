@@ -484,7 +484,7 @@ public sealed class Virtualize<TItem> : ComponentBase, IVirtualizeJsCallbacks, I
 
             var deferAnchorRestoreClear = shouldRestore
                 && (AnchorMode == VirtualizeAnchorMode.None
-                    || (AnchorMode & VirtualizeAnchorMode.End) != 0
+                    || AnchorMode == VirtualizeAnchorMode.End
                     || ((AnchorMode & VirtualizeAnchorMode.Start) != 0 && _deferPrependAnchorClear));
             if (!deferAnchorRestoreClear)
             {
