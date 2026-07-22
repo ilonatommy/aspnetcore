@@ -3313,34 +3313,30 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         container.SendKeys(Keys.End);
 
-        // The viewport must reach the very bottom once the delayed provider resolves the tail window.
-        long stEnd = 0, shEnd = 0, chEnd = 0;
+        long lastSh = -1;
         Browser.True(() =>
         {
-            stEnd = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
-            shEnd = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
-            chEnd = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
-            return shEnd - stEnd - chEnd < 2;
-        }, TimeSpan.FromSeconds(10), $"AnchorMode {anchorMode}: End key should land at the very bottom with variable-height rows (scrollTop={stEnd}, scrollHeight={shEnd}, clientHeight={chEnd}, gap={shEnd - stEnd - chEnd})");
-
-        // The bottom viewport must show real items, not loading placeholders.
-        Browser.True(() =>
-        {
-            var result = js.ExecuteScript(@"
-                var c = arguments[0];
-                var cr = c.getBoundingClientRect();
-                function visible(sel) {
-                    var els = c.querySelectorAll(sel);
-                    for (var i = 0; i < els.length; i++) {
-                        var r = els[i].getBoundingClientRect();
-                        if (r.bottom > cr.top + 1 && r.top < cr.bottom - 1) return true;
-                    }
-                    return false;
+            var placeholdersInViewport = (long)js.ExecuteScript(@"
+                var c = arguments[0], cr = c.getBoundingClientRect(), n = 0;
+                var els = c.querySelectorAll('.loading-placeholder');
+                for (var i = 0; i < els.length; i++) {
+                    var r = els[i].getBoundingClientRect();
+                    if (r.bottom > cr.top + 1 && r.top < cr.bottom - 1) n++;
                 }
-                return visible('.item[data-index]') && !visible('.loading-placeholder');
-            ", container);
-            return result is bool b && b;
-        }, TimeSpan.FromSeconds(10), $"AnchorMode {anchorMode}: real items (not placeholders) should fill the bottom viewport after End");
+                return n;", container);
+            var sh = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+            var settled = placeholdersInViewport == 0 && sh == lastSh;
+            lastSh = sh;
+            return settled;
+        }, TimeSpan.FromSeconds(10), $"AnchorMode {anchorMode}: list should settle with real (non-placeholder) rows after End");
+
+        var stEnd = (long)js.ExecuteScript("return arguments[0].scrollTop", container);
+        var shEnd = (long)js.ExecuteScript("return arguments[0].scrollHeight", container);
+        var chEnd = (long)js.ExecuteScript("return arguments[0].clientHeight", container);
+        var gap = shEnd - stEnd - chEnd;
+        Assert.True(gap <= 1,
+            $"AnchorMode {anchorMode}: after a single End press and the provider resolving real rows, the viewport " +
+            $"should rest at the very bottom, but it is {gap}px short (scrollTop={stEnd}, scrollHeight={shEnd}, clientHeight={chEnd}).");
     }
 
     [Theory]
