@@ -309,8 +309,8 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
     scrollTriggeredRender = false;
 
-    // End mode: pin new items into view if we're at the bottom now, or were and are still following.
-    if ((anchorMode & 2) && (bottomTracking.wasAtBottomLastRender || bottomTracking.reached)) {
+    // End mode pins new items into view when we're at the bottom now, or were and are still following.
+    if (((anchorMode & 2) || bottomTracking.following) && (bottomTracking.wasAtBottomLastRender || bottomTracking.reached)) {
       scrollElement.scrollTop = scrollElement.scrollHeight;
       ignoreAnchorScroll = true;
       // Start convergence only when there are more items to load (spacerAfter > 0).
@@ -453,6 +453,10 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToEnd = true;
       pendingJumpToStart = false;
+      if ((anchorMode & 2) === 0) {
+        bottomTracking.following = true;
+        bottomTracking.reached = true;
+      }
       if (!convergingToBottom && spacerAfter.offsetHeight > 0) {
         convergingToBottom = true;
         startConvergenceObserving();
@@ -462,6 +466,10 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToStart = true;
       pendingJumpToEnd = false;
+      if ((anchorMode & 2) === 0) {
+        bottomTracking.following = false;
+        bottomTracking.reached = false;
+      }
       if (!convergingToTop && spacerBefore.offsetHeight > 0) {
         convergingToTop = true;
         startConvergenceObserving();
@@ -488,7 +496,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
 
     // A user scroll is the only thing that (re)sets follow state (programmatic scrolls early-return above).
-    if (anchorMode & 2) {
+    if ((anchorMode & 2) || bottomTracking.following) {
       const atBottom = isViewportAtBottom();
       bottomTracking.following = atBottom;
       bottomTracking.reached = atBottom;
