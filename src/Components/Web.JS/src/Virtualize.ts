@@ -343,7 +343,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
 
     // End mode: pin new items into view if we're at the bottom now, or were and are still following.
-    if ((anchorMode & 2) && (bottomTracking.wasAtBottomLastRender || bottomTracking.reached)) {
+    if (((anchorMode & 2) || bottomTracking.following) && (bottomTracking.wasAtBottomLastRender || bottomTracking.reached)) {
       scrollElement.scrollTop = scrollElement.scrollHeight;
       ignoreAnchorScroll = true;
       // Start convergence only when there are more items to load (spacerAfter > 0).
@@ -479,6 +479,10 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToEnd = true;
       pendingJumpToStart = false;
+      if ((anchorMode & 2) === 0) {
+        bottomTracking.following = true;
+        bottomTracking.reached = true;
+      }
       if (!convergence.bottom && spacerAfter.offsetHeight > 0) {
         startConvergenceObserving('bottom');
       }
@@ -487,6 +491,9 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToStart = true;
       pendingJumpToEnd = false;
+      bottomTracking.following = false;
+      bottomTracking.reached = false;
+      bottomTracking.wasAtBottomLastRender = false;
       if (!convergence.top && spacerBefore.offsetHeight > 0) {
         startConvergenceObserving('top');
       }
@@ -512,7 +519,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     }
 
     // A user scroll is the only thing that (re)sets follow state (programmatic scrolls early-return above).
-    if (anchorMode & 2) {
+    if ((anchorMode & 2) || bottomTracking.following) {
       const atBottom = isViewportAtBottom();
       bottomTracking.following = atBottom;
       bottomTracking.reached = atBottom;
