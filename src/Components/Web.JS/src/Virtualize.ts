@@ -190,6 +190,11 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     // Follow intent: true in End mode until the user scrolls up. Drives the C# scroll-to-bottom path.
     following: (anchorMode & 2) !== 0,
   };
+  const clearBottomFollow = () => {
+    bottomTracking.following = false;
+    bottomTracking.reached = false;
+    bottomTracking.wasAtBottomLastRender = false;
+  };
   // Pending scroll correction after redistribution changes spacer→item heights.
   let pendingScrollCorrection = false;
   let scrollCorrectionItemIndex = 0;
@@ -491,9 +496,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       reobserveSpacers();
       pendingJumpToStart = true;
       pendingJumpToEnd = false;
-      bottomTracking.following = false;
-      bottomTracking.reached = false;
-      bottomTracking.wasAtBottomLastRender = false;
+      clearBottomFollow();
       if (!convergence.top && spacerBefore.offsetHeight > 0) {
         startConvergenceObserving('top');
       }
