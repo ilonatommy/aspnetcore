@@ -187,7 +187,7 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
     wasAtBottomLastRender: false,
     // Has the viewport actually reached the bottom? Not set at mount, stays sticky across appends.
     reached: false,
-    // Follow intent: true in End mode until the user scrolls up. Drives the C# scroll-to-bottom path.
+    // Follow intent: true in End mode (or after a user-initiated End-key jump) until the user scrolls away. Drives the C# scroll-to-bottom path in End mode.
     following: (anchorMode & 2) !== 0,
   };
   const clearBottomFollow = () => {
