@@ -1801,7 +1801,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
         Browser.MountTestComponent<BasicTestApp.QuickGridTest.QuickGridVariableHeightComponent>();
 
         Browser.Exists(By.Id("qg-vh-toggle-delay")).Click();
-        Browser.Contains("Provider delay: 150ms", () => Browser.Exists(By.Id("qg-vh-status")).Text);
+        Browser.Contains("Provider delay for QuickGrid: 150ms", () => Browser.Exists(By.Id("qg-vh-status")).Text);
 
         var container = Browser.Exists(By.Id("grid-variable-height"));
         var totalItems = Browser.Exists(By.Id("total-items"));
@@ -1946,7 +1946,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             {
                 // Real life providers come with at least a small delay
                 Browser.Exists(By.Id("qg-toggle-delay")).Click();
-                Browser.Contains("Provider delay on", () => Browser.Exists(By.Id("qg-status")).Text);
+                Browser.Contains("Provider delay for QuickGrid on", () => Browser.Exists(By.Id("qg-status")).Text);
             }
         }
 
@@ -2248,7 +2248,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         // Enable provider delay to simulate network latency.
         Browser.Exists(By.Id("qg-toggle-delay")).Click();
-        Browser.Contains("Provider delay on", () => Browser.Exists(By.Id("qg-status")).Text);
+        Browser.Contains("Provider delay for QuickGrid on", () => Browser.Exists(By.Id("qg-status")).Text);
 
         ScrollMidListAndWaitForRender(container, js);
         WaitForRenderToSettle(container, js);
@@ -2352,7 +2352,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
 
         // Enable provider delay to simulate network latency.
         Browser.Exists(By.Id("qg-toggle-delay")).Click();
-        Browser.Contains("Provider delay on", () => Browser.Exists(By.Id("qg-status")).Text);
+        Browser.Contains("Provider delay for QuickGrid on", () => Browser.Exists(By.Id("qg-status")).Text);
 
         // Scroll through items incrementally, checking for backward index jumps (flashing).
         var result = js.ExecuteAsyncScript(@"
@@ -2965,7 +2965,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             if (delay)
             {
                 Browser.Exists(By.Id("toggle-delay")).Click();
-                Browser.Contains("Provider delay: 500ms", () => Browser.Exists(By.Id("status")).Text);
+                Browser.Contains("Provider delay for Virtualize: 500ms", () => Browser.Exists(By.Id("status")).Text);
             }
         }
 
@@ -4383,7 +4383,7 @@ public class VirtualizationTest : ServerTestBase<ToggleExecutionModeServerFixtur
             if (delay)
             {
                 Browser.Exists(By.Id("toggle-delay")).Click();
-                Browser.Contains("Provider delay: 500ms", () => Browser.Exists(By.Id("status")).Text);
+                Browser.Contains("Provider delay for Virtualize: 500ms", () => Browser.Exists(By.Id("status")).Text);
             }
         }
 
