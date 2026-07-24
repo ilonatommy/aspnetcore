@@ -697,7 +697,8 @@ function init(dotNetHelper: DotNet.DotNetObject, spacerBefore: HTMLElement, spac
       if (rect.bottom > containerTop) {
         const existing = observersByDotNetObjectId[id].anchorSnapshot;
         const startAnchoring = (anchorMode & 1) !== 0 && !convergence.top;
-        if (!useNativeAnchoring && (anchorMode === 0 || anchorMode === 2 || startAnchoring) && existing && rect.top - containerTop > rect.height) {
+        const atScrollTop = scrollElement.scrollTop < 1;
+        if ((!useNativeAnchoring || atScrollTop) && (anchorMode === 0 || anchorMode === 2 || startAnchoring) && existing && rect.top - containerTop > rect.height) {
           return;
         }
         observersByDotNetObjectId[id].anchorSnapshot = {
